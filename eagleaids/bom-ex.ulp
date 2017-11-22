@@ -1,0 +1,3921 @@
+
+//////////////////////////////////////////////////////////////////////////////
+//
+// BOM-EX ENHANCED BILL OF MATERIALS
+//
+// Copyright (C) 2010-2014, Robert E. Starr
+//
+// Get the latest version at http://www.bobstarr.net
+//
+// Additional enhancements by Malcolm Miranda and Markus Baertschi
+//
+// REVISION HISTORY:
+//
+// 1.07 RES 04/01/10  Initial Release
+//
+// 1.08 RES 04/07/10  Added auto-load database support from global attribute.
+//                    If global attr 'DATABASE' exists we use the value
+//                    as the file pathname and load the database at startup.
+//
+// 1.09 RES 04/14/10  Minor user interface changes to save space.
+//
+// 1.10 RES 04/14/10  Added support for DNP attribute. Part ID names will
+//                    have (DNP) appended if the DNP attribute is set for
+//                    on the part.
+//
+// 1.11 RES 04/16/10  Added logic from part num manager to allow importing,
+//                    editing and updating of part numbers from within
+//                    BOM viewer. In list by name view part numbers are
+//                    editable and in list by value mode database parts may
+//                    be edited.
+//
+// 1.12 RES 04/19/10  Added logic to prevent DNP parts from appearing
+//                    in the order export files.
+//
+// 1.13 RES 04/21/10  Fixed bug causing multi-gate parts on different sheets
+//                    to appear multiple times in the bom list views.
+//
+// 1.14 RES 04/22/10  Changed database column heading names and fixed bug
+//                    when exporting order files and a blank partname was
+//                    was encountered.
+//
+// 1.15 RES 04/23/10  Fixed problem with BOM-ENTRY part-id missing.
+//                    Added logic to include addtional devices that
+//                    have no package but need to be included in the BOM
+//                    for ordering purposes (e.g. jumper blocks, etc).
+//
+// 1.16 RES 05/03/10  Added new dlgSelectionChanged() logic to part no
+//                    pick list dialog. Part number is updated when the
+//                    user clicks a different item. Double clicking accepts
+//                    the current item selected and closes the dialog.
+//
+// 1.17 RES 08/30/10  Added build qty options for digikey & generic order
+//                    export files. Fixed problem with generic CSV export
+//                    where DNP parts were being omitted.
+//
+// 1.18 RES 09/04/10  Added options to edit build qty's for order export.
+//
+// 1.19 RES 10/13/10  Fixed quantity calculations for parts with DNP
+//                    attributes for part order exports.
+//
+// 1.20 RES 11/15/10  Added logic to automatically use the parts id's for
+//                    the customer reference if the Customer Ref column is
+//                    not provided in the Digikey export function.
+//
+// 1.21 RES 11/29/10  Modified SaveBOM to append ListByPartID or ListByPartValue
+//                    to the filename depending on the current list view mode.
+//
+// 1.22 RES 02/13/11  Added export part number only option in export dialog.
+// 
+// 1.23 MM  02/25/11  Set part# enhancment allows setting groups of part
+//                    numbers in list by value mode!
+// 
+// 1.24 RES  02/26/11 Added database editing functionality and ability to 
+//                    enter a new part VALUE also when assigning part numbers.
+// 
+// 1.25 RES  02/26/11 Added export part numbers options to specify all part
+//                    numbers or part numbers assigned but not found in the
+//                    database. Changed sort orders for exporting so data
+//                    appears in a more logical order.
+// 
+// 1.26 RES  02/28/11 Restored original sort calls to fix bugs introduced
+//                    by inadvertant changes.
+// 
+// 1.27 RES  03/08/11 Added QTY attribute processing logic to allow 
+//                    BOM_ENTRY objects to specify an optional quantity.
+//
+// 1.28 RES  03/25/11 Changed Save BOM to use BOM configuration directory
+//                    rather than default schematic directory.
+//
+// 1.29 RES  04/29/11 Fixed DNP attribute check in CollectData(). Values other
+//                    than "T" were still being treated as DNP enabled.
+//
+// 1.30 RES  06/05/11 Changed generice CSV export to enclose part designators
+//                    string in quotes with commas between part names for 
+//                    generic order export file. This allows Excel to import
+//                    properly with commas between names. Also added part 
+//                    value column to generic order export.
+//
+// 1.31 RES  07/27/11 Removed three quantity options. Export order options
+//                    now prompt the user for the number of units to build.
+//
+// 1.32 RES  09/16/11 Added ability to change package along with part number
+//                    when editing a part number.
+//
+// 1.33 RES  10/17/11 Added option to override the part description with
+//                    DESC attribute. Mainly for use by BOM-ENTRY entries.
+//
+// 1.34 RES  10/30/11 Added buttons to allow clearing part numbers. 
+//
+// 1.35 RES  11/17/11 Added optional PN part number name support. User
+//                    may specify as PARTNO, PARTNUM or PN as attribute name.
+//
+// 1.36 RES  01/27/12 Added new Mouser CSV order upload format.
+//
+// 1.37 RES  02/08/12 Added variable to allow changing name of PARTNO
+//                    attribute to 'PN' for compatibility with the naming
+//                    convention used in Eagle v6.0 libraries.
+//
+//                    Added logic to only update part numbers that were
+//                    changed for each particular part. This improves
+//                    performance significnatly by reducing the size of
+//                    the script in cases where only a few part numbers 
+//                    are being updated. A checkbox was also added to apply
+//                    partnumber attributes globally if desired.
+//
+// 1.38 RES  02/16/12 Fixed bug with clear all part# attributes and when 
+//                    clearing partno attributes for a single part.
+//                    
+// 1.39 RES  02/24/12 Mosly minor UI changes.
+//                    
+// 1.40 RES  03/03/12 Changed default order upload file suffixes.
+//                    
+// 1.41 RES  03/16/12 Modified the Export and order file to compare part
+//                    value and part number order first. If the part number
+//                    is not supplied then it compares value and the part
+//                    package. This was done to avoid duplicate line items
+//                    in the BOM order export files where the same part might
+//                    be used with slightly difference packages (eg a cap
+//                    or other part packages with and without silkscreen
+//                    perimeter outlines).
+//                    
+// 1.42 RES  03/22/12 Fixed bugs from 1.41 changes.
+//                    
+// 1.43 RES  03/22/12 Added tabbed text and CSV file save BOM formats.
+//
+// 1.44 RES  04/09/12 Added part-id auto xref generation for database.
+//                    Changed export generic BOM output format.
+//                    
+// 1.45 RES  04/13/12 Added config file save/restore settings.
+//                    
+// 1.46 RES  05/17/12 Added command line option to set default window size.
+//                    
+// 1.47 RES  07/19/12 Integrated changes from Markus to trim quotes from
+//                    input database records fields.
+//                    
+// 1.48 MB   07/19/12 Added filtering for pick part dialog.
+//
+// 1.49 RES  08/05/12 Remove database create/edit features. Databases files
+//                    should be edited externally with a spreadsheet.
+//
+// 1.50 RES  02/22/13 Added package check scanning feature.
+//
+// 1.51 RES  06/21/13 Added option to override and include DNP parts in
+//                    the part order files.
+//                    
+// 1.52 RES  07/06/13 Fixed case sensitivity for attribute names when
+//                    collecting the known part attribute names at startup.
+//
+// 1.53 RES  07/22/13 Added package check scanning feature.
+//
+// 1.54 RES  09/11/13 Enhanced value checker function to tokenize the value
+//                    value string delimited by a space and search for each 
+//                    token in the part description text.
+//
+// 1.55 RES  09/24/13 Modified Digikey order file generation to allow sorting
+//                    only by the mfg part number and ignore the PartVal
+//                    to avoid duplicate line items when folks use the part
+//                    value field as a generic catch all.
+//
+// 1.56 RES  10/10/13 Added support for assembly variants. Note that a 
+//                    DNP attributes overrides the new assembly variant
+//                    place option. Thus, DNP attribute now act in a global
+//                    fashion to exclude parts.
+//
+// 1.57 RES  10/24/13 Minor enhancements.
+//
+// 1.58 RES  11/26/13 Corrected list view sort problems when regnerating view
+//                    list during part edits and such.
+//
+// 1.59 RES  11/30/13 Improved part value checker tool warnings.
+//
+// 1.60 RES  03/10/14 Changed HTML report to center text cells left/top.
+//
+// 1.61 RES  06/17/14 Added sort by part number option on other part order
+//                    export options. Initially this was only on the Digikey
+//                    option.
+//
+// 1.62 RES  08/05/14 Added logic to reckognize MFPN for part numbers.
+//
+// 1.63 RES  08/11/14 Added option to show parts with EXCLUDE attribute.
+//
+// 1.64 RES  12/02/14 Extended support for Eagle v7.
+//
+// 1.65 RES  12/02/14 Fix for parts with sheet 0.
+//
+// 1.66 RES  5/7/15   Fix for setting module part number ID references.
+//
+//////////////////////////////////////////////////////////////////////////////
+//
+// THIS PROGRAM IS PROVIDED AS IS AND WITHOUT WARRANTY OF ANY KIND,
+// EXPRESSED OR IMPLIED. IF YOU DON'T LIKE IT, DON'T USE IT!
+//
+//////////////////////////////////////////////////////////////////////////////
+
+#require 6.5100
+
+#usage "en: <b>Export a Bill Of Material</b> - v1.66\n"
+           "<p>"
+           "Generates a project's <i>Bill Of Material</i>."
+           "<p>"
+           "A database with additional information like order codes, manufacturers "
+           "or prices can be created and managed."
+           "<p>"
+           "This version uses ATRRIBUTE[PARTNO] for the database key. Thus, all parts "
+           "in a schematic should have an attribute of 'PARTNO' with the mfg part number. "
+           "Additionally the PARTNO attribute is used as the lookup key in the part database."
+           "<p>Get the latest version at: http://www.bobstarr.net<p>"
+           "<author>Author: Bob Starr (rtzaudio@comcast.net)</author>",
+       "de: <b>Stückliste exportieren</b>\n"
+           "<p>"
+           "Erzeugt die <i>Stückliste</i> (Bill Of Material) eines Projekts."
+           "<p>"
+           "Eine Datenbank mit zusätzlichen Informationen wie Bestellnummern, Herstellern "
+           "oder Preisen kann angelegt und verwaltet werden."
+           "<p>Get the latest version at: http://www.bobstarr.net<p>"
+           "<author>Author: Bob Starr (rtzaudio@comcast.net)</author>"
+
+string HelpTextEN =
+  "<b>HOW TO GENERATE A BILL OF MATERIALS</b>\n"
+  "<p>\n"
+  "<b>LIST TYPE</b>\n"
+  "<p>\n"
+  "The <i>Bill Of Materials</i> can be generated either as a list\n"
+  "of parts (where every part is listed on a line of its own),\n"
+  "or as a list of values, where all parts with the same value are grouped\n"
+  "together in one line. Use the <b>List by</b> combo box to view the list\n"
+  "by 'Parts' or 'Values'.\n"
+  "<p>\n"
+  "<b>Saving the Report</b>\n"
+  "<p>\n"
+  "The <b>Format</b> combo box sets the save report output to pure ASCII\n"
+  "<b>Text</b> or <b>HTML</b> format. Click on the <b><u>S</u>ave BOM</b>\n"
+  "button to save the report to disk. Click on the <b>Preview</b> button\n"
+  "to see a preview of the report data that will be saved to disk.\n"
+  "<p>\n"
+  "<b>PART DATABASE</b>\n"
+  "<p>\n"
+  "You can pull in additional information about the used parts by loading\n"
+  "a database file with the <b><u>L</u>oad</b> button.\n"
+  "<p>\n"
+  "A database file must consist of lines of text, each of which contains\n"
+  "one record consisting of CSV (<u>C</u>omma <u>S</u>eparated <u>V</u>alues)\n"
+  "or txt (<u>T</u>ab <u>S</u>eparated <u>V</u>alues) data.\n"
+  "The very first line must contain a \"header\", which defines a unique name for\n"
+  "each column, and the first column of every following line must contain\n"
+  "a unique (non-empty) key for this record.\n"
+  "<p>\n"
+  "An example for a valid database file would be:\n"
+  "<pre>\n"
+  "  Mfg Part Num	Mfg Name	VID	Vendor Part Num	Description\n"
+  "  MKS2C031001A00KSSD	WIMA	ME	505-MKS2.1/63/10	Polyester Film Capacitor 63V .1uF 10%\n"
+  "  C315C220K2G5TA	Kemet	ME	80-C315C220K2G	Multilayer Ceramic Capacitor (MLCC) - 200volts 22pF 10% C0G\n"  
+  "</pre>\n"
+  "Note that the columns are separated by a <b>tab</b> character (you may also\n"
+  "use a semicolon (';') to separate the columns, but then you will have to make sure\n"
+  "none of the data items contains a semicolon).\n"
+  "<p>\n"
+  "<b>ATTRIBUTES FOR BOM CONTROL</b>\n"
+  "<p>\n"
+  "The keys for looking up records in the database are built from the\n"
+  "part <b>ATTRIBUTE[PARTNO]</b> field. Each part should have an attribute of <b>PARTNO</b> defined \n"
+  "that is used to lookup in the database against the <b>Key</b> field described above.\n"
+  "<p>\n"
+  "The following part ATTRIBUTES are reckognized by the BOM processor:\n"
+  "<pre>\n"
+  " Attribute  Value          Description\n"
+  " ---------------------------------------------------------------------------------\n"
+  " PARTNO     [<i>MfgPartNum</i>]   Specifies mfg part number key in the database file.\n"
+  " BOM        [EXCLUDE]      Excludes part from the BOM listing.\n"
+  " DNP        [T/F]          Do not place identifier (T=true or F=false)\n"
+  "</pre>\n"
+  "<p>\n"
+  "Addtionally the following special attribtues are reckognized and concatenated to the\n"
+  "parts VALUE field during bom generation to list additional information for a part.\n"
+  "In some cases a part with the same value and package will differ for tolerance, temp\n"
+  "codes, etc. These additional attributes are concatenated to the part value field during\n"
+  "BOM generation so the part is given a unique line item entry. NOTE this behavior can be\n"
+  "overridden with the BOM[NOVALMOD] attribute described above. If the [NOVALMOD] flag is\n"
+  "also specified, the original value field will be used as is for value key comparisions\n"
+  "and the attribute modifiers below will not appear appended to the part value in the BOM"
+  "\n"
+  "<pre>\n"
+  " Attribute   Description\n"
+  " --------------------------------------------------------\n"
+  " TOL         tolerance (1%, 5%, etc)\n"
+  " TC          temp coefficient (caps, NPO, X7R, etc)\n"
+  " VOLT        voltage rating (caps, etc)\n"
+  " RATE        rating (watts, etc)\n"
+  " COLOR       color (for leds, etc)\n"
+  " LABEL       label (for buttons, switches, etc)\n"
+  " TYPE        type field\n"
+  " SIZE        package or other size code (0805, etc)\n"
+  " LOAD        load field\n"
+  " PLACE       place option text\n"
+  " OPT         generic option text\n"
+  " DESC        part description override text\n"
+  "</pre>\n"
+  "<p>\n"
+  "<b>EXPORTING AN ORDER BOM</b>\n"
+  "<p>\n"
+  "You can export a BOM in Digi-Key BOM upload order format in CSV or TAB format.\n"
+  "However, this feature requires that part database be in the following format\n"
+  "with the exact column field names as shown below (less ticks):\n"
+  "<p>\n"
+  "<pre>\n"
+  "Col   Field Name                  Description\n"
+  "-------------------------------------------------------------------\n"
+  " 0    'Mfg Part Num'              PARTNUM key for schematic\n"
+  " 1    'Mfg Name'                  Mfg name of the part\n"
+  " 2    'VID'                       Vendor ID (eg 'DK'=Digikey)\n"
+  " 3    'Vendor Part Num'           Specifies the vendor part number\n"
+  " 4    'Description'               Part description (OPTIONAL)\n"
+  " 5    'Pkg Code'                  Package code 0603, 0504, etc (OPTIONAL)\n"
+  "</pre>\n"
+  "<p>\n"
+  "Note that the 'Qty' fields are optional and will be calculated\n"
+  "automatically if not specified when exporting order files.\n"
+  "<p>\n"
+  ;
+
+//////////////////////////////////////////////////////////////////////////////
+//
+
+string strVersion = "1.66";
+
+int nPartCount;
+int nBOMCount;
+string strBOMCount;
+
+numeric string Lines[];
+
+int PartSheet[];
+int PartDNP[];
+int PartQty[];
+
+numeric string PartNum[], PartName[], PartVal[], PartAttr[], 
+               PartDev[], PartPkg[], PartDesc[];
+
+numeric string PartNumPrev[];
+
+numeric string PartValSave[];
+numeric string PartDevChange[];
+
+numeric string PartModule[];
+numeric string PartModulepartName[];
+
+int Selected = -1;
+int SortCol = 0;
+
+enum { ltParts, ltValues };     // List Types
+enum { ofText, ofTextTabbed, ofTextCSV, ofHTML };        // Output Formats
+
+int ListType            = ltParts;
+int OutputFormat        = ofText;
+int ApplyAllAttrs       = 0;
+int ShowExcludedParts   = 0;
+
+string DefaultFileName;
+
+int DatabaseRecCount;
+string Database[];
+string DatabaseFields[];
+
+char DatabaseSeparator  = '\t';
+
+string DatabaseFilename;
+
+int PartNumModified     = 0;
+int PartNumPicked       = 0;
+
+char ValueSeparator     = ':';
+
+string ConfigFilePath;
+string ConfigFileName   = "bom-ex.cfg";
+
+string nullKey          = "*";
+string dnpSuffix        = "(DNP)";
+
+// This sets the default minimum window size. Make it smaller if you
+// have a small monitor. Or, you can override this with a command line
+// option.
+
+int WindowMinWidth      = 1200;
+
+// This defines the attribute name that will be written to parts
+// in the schematic/board. Note any old part number attribute names are
+// preserved and the new attributes will may also be assigned to the
+// name below.
+
+string strPartNumAttrName = "PARTNO";
+
+int BldQty1             = 1;    // specifies the qty of units to build
+
+// Build Variant Support
+string CurrentVariant = "";
+string Variants[] = { "" };
+int    cntVD = 0;
+int    VDsel = 0;
+
+
+//////////////////////////////////////////////////////////////////////////////
+// First, process any command line options
+
+/*
+void debug (string s)
+{
+    output("debug.out","at")
+    {
+        printf("%s",s);
+    };
+}
+*/
+
+void unknown(string m)
+{
+    if (dlgMessageBox("unknown parameter\n" + m, "OK", "Cancel" ) != 0) exit(-1);
+    return;
+}
+
+if (argc > 1)
+{
+    int n = 1;
+    string para;
+    
+    do {
+        para = strupr(argv[n]);
+        if      (para[0] == 'W' )  { para[0] = ' ';  WindowMinWidth = strtod(para); }
+        else if (para[0] == 'B' )  { para[0] = ' ';  BldQty1        = strtod(para); }
+        else if (para[0] == 'C' )  { ConfigFilePath = strsub(para, 1); }
+        else unknown(para);
+        n++;
+    } while (argv[n]);
+}
+  
+//////////////////////////////////////////////////////////////////////////////
+// Some Helper Functions
+
+int isquote(char c)
+{
+    return (c == '"') ? 1 : 0;
+}
+
+// Trim leading and trailing white space characters
+string TrimWhiteSpace(string s)
+{
+    while (s && isspace(s[0]))
+        s = strsub(s, 1);
+    while (s && isspace(s[strlen(s) - 1]))
+        s = strsub(s, 0, strlen(s) - 1);
+    return s;
+}
+
+// Trim leading and trailing quote characters from string
+string TrimQuotes(string s)
+{
+    while (s && isquote(s[0]))
+        s = strsub(s, 1);
+    while (s && isquote(s[strlen(s) - 1]))
+        s = strsub(s, 0, strlen(s) - 1);
+    return s;
+}
+
+// Trim DNP suffix from a string
+string TrimDNPSuffix(string s)
+{
+    // we have to strip off any (DNP) suffix from the part name
+    int lensuffix = strlen(dnpSuffix);
+    int lenstr    = strlen(s);
+    if (lenstr > lensuffix)
+    {
+        if (strstr(s, dnpSuffix) > 0)
+            s = strsub(s, 0, lenstr - lensuffix);
+    }
+    return s;
+}
+
+int PartSearch(string partname)
+{
+    for (int i=0; i < nPartCount; i++)
+    {
+        if (PartName[i] == partname)
+            return i;
+    }
+    return -1;
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// Here we're checking for a specific set of known attributes that
+// we will allow to display in the Attributes column of the BOM. Any other
+// part attributes we will ignore for now.
+
+int IsKnownAttribute(string attrname)
+{
+    string names = "TOL:TEMP:TC:VOLT:VOLTAGE:RATE:RATING:COLOR:LABEL:TYPE:SIZE:LOAD:PLACE:FREQ:OPT";
+    string a[];
+    int n = strsplit(a, names, ':');
+    int i;
+    for (i=0; i < n; i++)
+    {
+        if (attrname == a[i])
+            return 1;
+    }
+    return 0;
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// Here we're checking for a specific device names that have no associated
+// package that we want added to the BOM listing also. We don't add any
+// devices without packages to listing except those listed here.
+
+int IsKnownDevice(string devname)
+{
+    string names = "BOM-ENTRY:BOM-PART:JUMPER:JUMP-A:JUMP-B:JUMP-Q";
+    string a[];
+    int n = strsplit(a, names, ':');
+    int i;
+    for (i=0; i < n; i++)
+    {
+        if (devname == a[i])
+            return 1;
+    }
+    return 0;
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// Collect all part data for the BOM and process and handle any attribute
+// modifiers found for the part.
+
+void AddPartData(UL_PART P, UL_INSTANCE I)
+{
+    int dnp = 0;
+    int exclude = 0;
+    
+    if ((P.device.package) || IsKnownDevice(P.device.name))
+    {
+        // PART NUMBER CANNOT BE EMPTY FOR LIST BY VALUE SORT!
+        string partnum = nullKey;
+        string val     = P.value;
+        string attrs   = "";
+        string desc    = "";
+        int qty        = 0;
+
+        if (!P.populate)
+            dnp = 1;
+        
+        P.attributes(A)
+        {
+            // Get the attribute name and value in upper case
+            string aname  = strupr(A.name);
+            string avalue = strupr(A.value);
+            
+            if ((aname == "PARTNUM") || (aname == "PARTNO") || (aname == "PN") || (aname == "MPN") || (aname == "MFPN"))
+            {
+                //if (strPartNumAttrName != aname)
+                //    strPartNumAttrName = aname;
+
+                // trim any leading/trailing white space from part number
+                partnum = TrimWhiteSpace(avalue);
+
+                // set to nullkey if empty PARTNO attribute
+                if (partnum == "")
+                    partnum = nullKey;
+            }
+            else if (aname == "VALUE")
+            {
+                // Attribute VALUE overrides native value
+                if (strlen(avalue))
+                    val = avalue;
+            }
+            else if (aname == "BOM")
+            {
+                if (!ShowExcludedParts)
+                {
+                    // Exclude part from BOM?
+                    if (avalue == "EXCLUDE")
+                        exclude = 1;
+                }
+            }
+            else if (aname == "DNP")
+            {
+                // Exclude part from BOM?
+                if (avalue == "T")
+                    dnp = 1;
+            }
+            else if (aname == "QTY")
+            {
+                // Exclude part from BOM?
+                qty = strtol(A.value);
+            }
+            else if (aname == "DESC")
+            {
+                // Part description override (mainly for BOM-ENTRY devices)
+                desc = TrimWhiteSpace(A.value);
+            }
+            else
+            {
+                if (IsKnownAttribute(aname))
+                {
+                    if (strlen(attrs))
+                        attrs += "/";
+                    attrs += A.value;
+                }
+            }
+        }
+
+        if (!exclude)
+        {
+            // We have to check to make sure the part has not already been added
+            // since it's possible a multi-gate part can appear on multiple sheets.
+            //
+            // In this case we only need to update the attributes on the first
+            // instance encountered for the attributes update process.
+
+            if (!lookup(PartName, P.name, 0))
+            {
+                /* Ignore parts if sheet 0, this indicates uninvoked gates */
+                if (I.sheet == 0)
+                {
+                    string msg;
+                    sprintf(msg, "Warning: Part '%s' may have uninvoked gates!", P.name);
+                    dlgMessageBox(msg, "OK");
+                }
+                else
+                {                
+                    PartSheet[nPartCount]   = I.sheet;
+                    PartName[nPartCount]    = P.name;
+                    PartVal[nPartCount]     = val;
+                    PartValSave[nPartCount] = val;
+                    PartAttr[nPartCount]    = attrs;
+                    PartNum[nPartCount]     = partnum;
+                    PartNumPrev[nPartCount] = partnum;
+                    PartDev[nPartCount]     = P.device.name;
+                    PartPkg[nPartCount]     = (P.device.package) ? P.device.package.name : "*";
+                    PartDesc[nPartCount]    = (desc != "") ? desc : P.device.headline;
+                    PartDNP[nPartCount]     = dnp;
+                    PartQty[nPartCount]     = qty;
+                    PartModule[nPartCount]  = (P.module) ? P.module.name : "";
+                    PartModulepartName[nPartCount]  = (P.module) ? P.modulepart.name : "";
+    
+                    if (!dnp)
+                        ++nBOMCount;
+                        
+                    nPartCount++;
+                }
+            }
+        }
+    }
+}
+
+void CollectPartData(string var)
+{
+    // We must zero out all the part names each time this function is called,
+    // otherwise the names still exist after each call and the lookup() call
+    // that checks for duplicates causes problems since it thinks everything
+    // is a duplicate on subsequent calls to this function.
+    
+    int i;
+    for(i=0; i < nPartCount; i++)
+        PartName[i]="";
+    
+    nPartCount = nBOMCount = 0;
+    
+    schematic(S)
+    {
+        S.allparts(P)
+        {
+            // Module instances
+            if (P.modulepart) {
+                P.modulepart.instances(I)
+                    AddPartData(P, I);
+            }
+            else
+            {
+                // Sheet instances
+                P.instances(I)            
+                    AddPartData(P, I);
+            }
+        }
+    }
+    
+    //string msg;
+    //sprintf(msg, "Variant='%s' Count=%d BOMCount=%d", var, nPartCount, nBOMCount);
+    //dlgMessageBox(msg, "OK");
+
+    sprintf(strBOMCount, "  Total Parts:%d", nBOMCount);
+}
+
+//////////////////////////////////////////////////////////////////////////////
+//
+
+string DatabaseHeader(void)
+{
+    string s;
+
+    if (Database[0])
+    {
+        string a[];
+        int n = strsplit(a, Database[0], DatabaseSeparator);
+        int i;
+
+        for (i = 1; i < n; i++)
+        {
+            s += "\t" + a[i];
+            DatabaseFields[i - 1] = a[i];
+        }
+
+        DatabaseFields[i - 1] = "";
+    }
+    return s;
+}
+
+//////////////////////////////////////////////////////////////////////////////
+//
+
+string GetKey(int i)
+{
+    return PartNum[i];
+}
+
+string DatabaseLookup(string key, int f)
+{
+    string s;
+    s = lookup(Database, key, DatabaseFields[f], DatabaseSeparator);
+    if (!s || (s == DatabaseFields[f]))
+        s = nullKey;
+    return s;
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// Generate parts list in part name order
+
+void GeneratePartList(void)
+{
+    int NumLines = 0;
+    //XXX column sequence?
+    Lines[NumLines++] = "Part\tValue\tAttributes\tPackage\tDescription\tPart Num" + DatabaseHeader();
+
+    for (int i=0; i < nPartCount; i++)
+    {
+        // append (DNP) suffix on part name if needed
+        string partname;
+        partname = PartName[i];
+        if (PartDNP[i])
+            partname += dnpSuffix;
+
+        Lines[NumLines] = partname + "\t" + PartVal[i] + "\t" +
+                          PartAttr[i] + "\t" + PartPkg[i] + "\t" + PartDesc[i] + "\t" + PartNum[i];
+
+        if (Database[0])
+        {
+            string key = GetKey(i);
+
+            for (int f = 0; DatabaseFields[f]; f++)
+                Lines[NumLines] += "\t" + DatabaseLookup(key, f);
+
+            Lines[NumLines] += "\t" + key; // hidden field!
+        }
+        NumLines++;
+    }
+
+    Lines[NumLines] = "";
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// Generate parts list in part value order
+
+void GenerateValueList(void)
+{
+    int NumLines = 0;
+    int Index[];
+
+    //XXX column sequence?
+    Lines[NumLines++] = "Qty\tValue\tPart Num\tPackage\tParts" + DatabaseHeader();
+
+    sort(nPartCount, Index, PartVal, PartNum, PartDev, PartName);
+    
+    for (int n1 = 0, n2 = 0; ++n2 <= nPartCount;)
+    {
+        int i1 = Index[n1];
+
+        if (n2 < nPartCount)
+        {
+            int i2 = Index[n2];
+            // check for same value but different partnum
+            if ((PartVal[i1] == PartVal[i2]) && (PartDev[i1] == PartDev[i2]))
+            {
+                if (strlen(PartNum[i1]) && strlen(PartNum[i2]))
+                {
+                    if (PartNum[i1] == PartNum[i2])
+                        continue;
+                }
+                else
+                {
+                    continue;
+                }
+            }
+        }
+
+        string Quantity;
+
+        // Calculate the qty of parts needed to build one unit less any DNP parts.
+        int uqty = n2 - n1;
+
+        int nn1 = n1;
+        int nn2 = n2;
+        int ii1 = i1;
+
+        for (;;)
+        {
+            // append (DNP) suffix on part name if needed
+            if (PartDNP[ii1] && uqty)
+                --uqty;
+
+            if (++nn1 < nn2)
+                ii1 = Index[nn1];
+            else
+                break;
+        }
+        
+        if (PartQty[i1])
+            uqty = PartQty[i1];
+
+        sprintf(Quantity, "%d", uqty);
+        Lines[NumLines] = Quantity + "\t" + PartVal[i1] + "\t" + PartNum[i1] + "\t" + PartPkg[i1] + "\t";
+
+        for (;;)
+        {
+            // append (DNP) suffix on part name if needed
+            string partname;
+            partname = PartName[i1];
+            if (PartDNP[i1])
+                partname += dnpSuffix;
+
+            Lines[NumLines] += partname;
+
+            if (++n1 < n2)
+            {
+                i1 = Index[n1];
+                Lines[NumLines] += ", ";
+            }
+            else
+                break;
+        }
+
+        if (Database[0])
+        {
+            string key = GetKey(i1);
+
+            for (int f = 0; DatabaseFields[f]; f++)
+                Lines[NumLines] += "\t" + DatabaseLookup(key, f);
+
+            Lines[NumLines] += "\t" + key; // hidden field!
+        }
+        NumLines++;
+    }
+    Lines[NumLines] = "";
+}
+
+//////////////////////////////////////////////////////////////////////////////
+//
+
+void GenerateList(void)
+{
+    switch (ListType)
+    {
+    case ltParts:
+        GeneratePartList();
+        //SortCol = 1;
+        break;
+    case ltValues:
+        GenerateValueList();
+        //SortCol = 5;
+        break;
+    }
+}
+
+//////////////////////////////////////////////////////////////////////////////
+//
+
+string MakeListHeader(void)
+{
+    string s;
+    schematic(SCH) sprintf(s, "BOM-EX v%s exported from %s at %s", strVersion, SCH.name, t2string(time()));
+    return s;
+}
+
+string MakeListText(void)
+{
+    int l, Width[];
+    for (l = 0; Lines[l]; l++)
+    {
+        string a[];
+        for (int n = strsplit(a, Lines[l], '\t'); n--;)
+            Width[n] = max(Width[n], strlen(a[n]));
+    }
+
+    string List;
+    //List = MakeListHeader() + "\n\n";
+    int numHeaders;
+
+    for (l = 0; Lines[l]; l++)
+    {
+        string line, a[];
+        int n = strsplit(a, Lines[l], '\t');
+        if (l == 0)
+            numHeaders = n;
+        else
+            n = numHeaders; // for the hidden key!
+        for (int i = 0; i < n; i++)
+        {
+            string s;
+            sprintf(s, "%s%-*s", line ? " " : "", Width[i], a[i]);
+            line += s;
+        }
+        List += line + "\n";
+    }
+    return List;
+}
+
+string MakeListTextTabbed(void)
+{
+    int l;
+    int numHeaders;
+    string List;
+
+    for (l=0; Lines[l]; l++)
+    {
+        string line, a[];
+        int n = strsplit(a, Lines[l], '\t');
+        if (l == 0)
+            numHeaders = n;
+        else
+            n = numHeaders; // for the hidden key!
+        for (int i = 0; i < n; i++)
+        {
+            string s;
+            sprintf(s, "%s", a[i]);
+            if (i < n-1)
+                s += "\t";
+            line += s;
+        }
+        List += line + "\n";
+    }
+    return List;
+}
+
+string MakeListTextCSV(void)
+{
+    int l;
+    int numHeaders;
+    string List;
+
+    for (l=0; Lines[l]; l++)
+    {
+        string line, a[];
+        int n = strsplit(a, Lines[l], '\t');
+        if (l == 0)
+            numHeaders = n;
+        else
+            n = numHeaders; // for the hidden key!
+        for (int i = 0; i < n; i++)
+        {
+            string s;
+            sprintf(s, "\"%s\"", a[i]);
+            if (i < n-1)
+                s += ",";
+            line += s;
+        }
+        List += line + "\n";
+    }
+    return List;
+}
+
+string MakeListHTML(void)
+{
+    string List;
+    //List = "<b>" + MakeListHeader() + "</b>\n<p>\n";
+    List += "<table border=\"1\">\n";
+    int numHeaders;
+
+    for (int l = 0; Lines[l]; l++)
+    {
+        List += "<tr valign=\"top\">";
+        string a[];
+        int n = strsplit(a, Lines[l], '\t');
+
+        if (l == 0)
+            numHeaders = n;
+        else
+            n = numHeaders; // for the hidden key!
+
+        for (int i = 0; i < n; i++)
+        {
+            if (l == 0)
+                a[i] = "<b>" + a[i] + "</b>";
+            List += "<td>" + a[i] + "</td>";
+        }
+        List += "</tr>\n";
+    }
+    List += "</table>\n";
+    return List;
+}
+
+string MakeList(void)
+{
+    switch (OutputFormat)
+    {
+    case ofText:
+        return MakeListText();
+        break;
+    case ofTextTabbed:
+        return MakeListTextTabbed();
+        break;
+    case ofTextCSV:
+        return MakeListTextCSV();
+        break;
+    case ofHTML:
+        return MakeListHTML();
+        break;
+    }
+    return "";
+}
+
+void ViewList(void)
+{
+    dlgDialog("Bill Of Material - Preview")
+    {
+        string s = MakeList();
+        if (OutputFormat == ofText)
+            s = "<pre>" + s + "</pre>";
+        dlgHBoxLayout dlgSpacing(650);
+        dlgHBoxLayout
+        {
+            dlgVBoxLayout dlgSpacing(300);
+            dlgTextView(s);
+        }
+        dlgHBoxLayout
+        {
+            dlgStretch(1);
+            dlgPushButton("-Close") dlgReject();
+        }
+    };
+}
+
+void SaveBOM(void)
+{
+    string fname;
+    string extname;
+    string tmp;
+
+    switch (OutputFormat)
+    {
+    case ofText:
+    case ofTextTabbed:
+        extname = ".txt";
+        break;
+    case ofTextCSV:
+        extname = ".csv";
+        break;
+    case ofHTML:
+        extname = ".htm";
+        break;
+    default:
+        extname = ".bom";
+        break;
+    }
+
+    if (ListType==ltParts)
+        tmp = "_ListByParts" + extname;
+    else
+        tmp = "_ListByValues" + extname;
+
+    //schematic(SCH) fname = filesetext(SCH.name, tmp);
+    fname = filesetext(ConfigFilePath+DefaultFileName, tmp);
+
+    fname = dlgFileSave("Save BOM", fname);
+
+    if (fname)
+    {
+        string a[];
+        if (!fileglob(a, fname) || dlgMessageBox("File '" + fname + "' exists\n\nOverwrite?", "+&Yes", "-&No") == 0)
+        {
+            output(fname, "wt")
+            {
+                printf("%s", MakeList()); // using "%s" to avoid problems if list contains any '%'
+            }
+        }
+    }
+}
+
+int ReadDatabase(string fname)
+{
+    string data;
+    if (fileread(data, fname) > 0)
+    {
+        DatabaseRecCount  = strsplit(Database, data, '\n');
+        DatabaseSeparator = (strchr(Database[0], '\t') > -1) ? '\t' : ';';
+        
+        if (DatabaseRecCount)
+        {
+            // Here we're adding an extra column to the database that adds
+            // a line item cross reference number to the database. This 
+            // cross refererence appears in the BOM reports and order files
+            // as a cross reference between the part-id and line items.
+
+            int fieldcount;
+            string fields[];
+            string rec;
+            string s;
+
+            // Process the header record and add XREF column
+            
+            rec = "";
+                            
+            fieldcount = strsplit(fields, Database[0], DatabaseSeparator);
+
+            for (int x=0; x < fieldcount; x++)
+            {
+                sprintf(s, "%s%c", TrimQuotes(fields[x]), DatabaseSeparator);
+                rec += s;
+            }
+
+            sprintf(Database[0], "%sXREF", rec);
+
+            // Now add the xref column data to the end of each record.
+
+            for (int i=1; i < DatabaseRecCount; i++)
+            {
+                rec = "";
+                
+                fieldcount = strsplit(fields, Database[i], DatabaseSeparator);
+                
+                for (int x=0; x < fieldcount; x++)
+                {
+                    sprintf(s, "%s%c", TrimQuotes(fields[x]), DatabaseSeparator);
+                    rec += s;
+                }
+
+                sprintf(Database[i], "%sREF%d", rec, i);
+            }
+        }
+        return 1;
+    }
+    return 0;
+}
+
+
+//////////////////////////////////////////////////////////////////////////////
+// Load database
+
+void LoadDatabase(string fname)
+{
+    if (!strlen(fname))
+        fname = dlgFileOpen("Open database file", ConfigFilePath, "Database files (*.txt *.csv);;All files (*)");
+
+    if (fname)
+    {
+        // write last path in file to remember for next start
+        output(filedir(argv[0])+ConfigFileName, "wt")
+        printf("%s", filedir(fname));
+
+        ConfigFilePath = filedir(fname);
+
+        if (ReadDatabase(fname))
+        {
+            DatabaseFilename = fname;
+
+            GenerateList();
+        }
+    }
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// Allow user to edit the part number data for a part
+
+int nPickSel = 0;
+int nFilterByType = 0;
+
+numeric string PickView[];
+numeric string PickLine;
+
+numeric string PickPartNum;
+numeric string PickPartVal;
+numeric string PickPartDev;
+
+string GetDatabaseRecord(int row)
+{
+    string s;
+    string a[];
+
+    int n = strsplit(a, Database[row], DatabaseSeparator);
+    int i;
+
+    for (i=0; i < n; i++)
+        s += a[i] + "\t";
+
+    s = strsub(s, 0, strlen(s) - 1);
+
+    return s;
+}
+
+string PickViewGetDatabaseField(int row, int col)
+{
+    int n;
+    string s;
+    string a[];
+//  n = strsplit(a, Database[row], DatabaseSeparator);
+    n = strsplit(a, PickView[row], DatabaseSeparator);
+    if (col < n)
+        s = a[col];
+    return s;
+}
+
+//
+//  Fill the array PickView with all of the database records who match the filter term
+//
+string FilterTerm = ""; // Global variable for persistent filter term
+int PickViewCount;
+
+void PickViewFilter (string f)
+{
+    int i,j;
+    string s, rec, fi[];
+
+    // Replace '*' with '.*' to be able to use a simple '*' as wildcard 
+    i=strsplit(fi,f,'*');
+    j=0;
+    f=fi[j++];
+    while (j < i) { f=f+".*"+fi[j++]; } 
+        
+    PickViewCount=0;
+    PickView[0]="";
+    PickView[PickViewCount++] = GetDatabaseRecord(0);
+
+    for (i=1; i < DatabaseRecCount; i++)
+    {
+        rec = GetDatabaseRecord(i);
+
+        // Filter by column, if desired, 's' contains the test we want to filter against
+        if (nFilterByType > 0)
+        {
+            string sa[];
+            strsplit(sa,rec, DatabaseSeparator);
+            s = sa[nFilterByType - 1];
+        }
+        else
+        {
+            s = rec;
+        }
+
+        int len;
+//          int pos = strxstr(s, f, 0, len);
+        int pos = strxstr(strupr(s),strupr(f));
+
+        if (pos >= 0)
+            PickView[PickViewCount++] = rec;
+
+    }
+
+    PickView[PickViewCount] = "";
+}
+
+//
+// Find the position of a part in the PickList array
+//
+int PickListPosition (string partnum)
+{
+    int i;
+    int p = 0;
+    // Set the list selection to the current part number if possible
+    for (i=0; i < PickViewCount; i++)
+    {
+        string a[];
+        strsplit(a, PickView[i], DatabaseSeparator);
+        if (partnum == a[0])
+        {
+            return i;
+            break;
+        }
+    }   
+    return 0;
+}
+
+void OnFilterByChange()
+{
+    PickViewFilter(FilterTerm);
+    nPickSel = PickListPosition(PickPartNum);
+}
+ 
+void OnPickSelChanged()
+{
+    PickPartNum = PickViewGetDatabaseField(nPickSel, 0);
+}
+
+void EditPartEntry(string partname)
+{
+    int ndx = PartSearch(partname);
+    
+    if (ndx == -1)
+    {
+        string msg;
+        sprintf(msg, "Error - part ID '%s' not found!", partname);
+        dlgMessageBox(msg, "OK");
+        return;
+    }
+
+    // this call is needed to load the database header fields
+    DatabaseHeader();
+
+    PartNumPicked = 0;
+    PickPartNum = PartNum[ndx];
+    PickPartVal = PartVal[ndx];
+    PickPartDev = PartDev[ndx];
+
+    PickViewFilter(FilterTerm);
+    nPickSel = PickListPosition(PickPartNum);
+    
+    int result;
+
+    if (Database[0])
+    {
+        int i;
+        int count = 0;
+        string Fstring;
+
+        string caption;
+        sprintf(caption, "Pick Part - %s", partname);
+        result = dlgDialog(caption)
+        {
+            dlgHBoxLayout dlgSpacing(1000);
+            
+            dlgHBoxLayout
+            {
+                dlgPushButton("Clear") {
+                    nFilterByType = 0;
+                    FilterTerm = Fstring = "";
+                    PickViewFilter(FilterTerm);
+                    nPickSel = PickListPosition(PickPartNum);
+                }                // Filtering: A filter show only the matching records
+                Fstring = FilterTerm;
+                dlgStringEdit(Fstring);
+                dlgPushButton("+Filter") {
+                    FilterTerm = Fstring;
+                    PickViewFilter(Fstring);
+                    nPickSel = PickListPosition(PickPartNum);
+                }
+
+                dlgLabel("By:");
+                
+                string combo[];
+                string a[];
+                string hdr = GetDatabaseRecord(0);
+                int cnt = strsplit(a, hdr, DatabaseSeparator);
+                combo[0] = "(all fields)";
+                for (int i=0; i < cnt; i++)
+                    combo[i+1] = a[i];
+                    
+                dlgComboBox(combo, nFilterByType) OnFilterByChange();
+
+
+            }
+
+            dlgHBoxLayout
+            {
+                dlgVBoxLayout dlgSpacing(300);
+                int nSortCol = 5;
+                dlgListView("", PickView, nPickSel, nSortCol)
+                {
+                    if (dlgSelectionChanged())
+                        OnPickSelChanged();
+                    else
+                        dlgAccept();    // double click
+                }
+            }
+            dlgHBoxLayout
+            {
+                dlgLabel("Part Num:");
+                dlgStringEdit(PickPartNum);
+                dlgLabel("Value:");
+                dlgStringEdit(PickPartVal);
+                dlgLabel("Device:");
+                dlgStringEdit(PickPartDev);
+                dlgLabel("Package:");
+                dlgLabel(PartPkg[ndx]);
+                
+                dlgStretch(1);
+                dlgPushButton("&OK") dlgAccept();
+                dlgPushButton("-Cancel")  dlgReject();
+            }
+        };
+
+        if (result)
+        {
+            // User clicked OK, save the part number and any optional new
+            // part value that needs to be assigned to the part.
+            
+            PickPartNum = TrimWhiteSpace(PickPartNum);
+            PickPartVal = TrimWhiteSpace(PickPartVal);
+            PickPartDev = TrimWhiteSpace(PickPartDev);
+            FilterTerm = TrimWhiteSpace(FilterTerm);
+            
+            PartNumPicked = 1;
+            PartNum[ndx] = PickPartNum;
+            PartVal[ndx] = PickPartVal;
+            
+            PartDevChange[ndx] = PickPartDev;
+
+            PartNumModified = 1;
+
+            GenerateList();
+         }
+    }
+    else
+    {
+        result = dlgDialog("Part Number Edit")
+        {
+            dlgHBoxLayout
+            {
+                dlgGroup("Edit Part Number")
+                {
+                    dlgGridLayout
+                    {
+                        dlgCell(0, 0) dlgLabel("Part Name:");
+                        dlgCell(0, 1) dlgLabel(partname);
+
+                        dlgCell(1, 0) dlgLabel("Part Value:");
+                        dlgCell(1, 1) dlgStringEdit(PickPartVal);
+
+                        dlgCell(2, 0) dlgLabel("Part Device:");
+                        dlgCell(2, 1) dlgStringEdit(PickPartDev);
+
+                        dlgCell(3, 0) dlgLabel("Part Package:");
+                        dlgCell(3, 1) dlgLabel(PartPkg[ndx]);
+
+                        dlgCell(4, 0) dlgLabel("Part Number:");
+                        dlgCell(4, 1) dlgStringEdit(PickPartNum);
+                    }
+                }
+                dlgVBoxLayout
+                {
+                    dlgStretch(2);
+                    dlgPushButton("+OK") dlgAccept();
+                    dlgPushButton("-Cancel") dlgReject();
+                }
+            }
+        };
+
+        if (result)
+        {
+            PickPartNum = TrimWhiteSpace(PickPartNum);
+            PickPartVal = TrimWhiteSpace(PickPartVal);
+            PickPartDev = TrimWhiteSpace(PickPartDev);
+
+            PartNumPicked = 1;
+            PartNum[ndx] = PickPartNum;
+            PartVal[ndx] = PickPartVal;
+            
+            PartDevChange[ndx] = PickPartDev;
+
+            PartNumModified = 1;
+
+            GenerateList();
+         }
+    }
+}
+
+void EditPart(void)
+{
+    if (nPartCount)
+    {
+        if (Selected >= 0)
+        {
+            // NOTE: THE VIEW COL NUM FOR a[n] MUST CORRESPOND TO THE PART ID
+            string a[];
+            strsplit(a, Lines[Selected], '\t');
+            // Column 1 Lines[] contains the part-id!
+            string partname = a[0];
+            // we have to strip off any (DNP) suffix from the part name
+            partname = TrimDNPSuffix(partname);
+            EditPartEntry(partname);
+        }
+        else
+        {
+            dlgMessageBox("Please select a part from the list!");
+        }
+    }
+    else
+    {
+        dlgMessageBox("No Parts Found!");
+    }
+}
+
+void EditPartSet(void)
+{
+    if (!nPartCount)
+    {
+        dlgMessageBox("No Parts Found!");
+        return;
+    }
+    
+    if (ListType == ltParts)
+        EditPart();
+    else
+    {
+        if (Selected >= 0)
+        {
+            // NOTE: THE VIEW COL NUM FOR a[n] MUST CORRESPOND TO THE PART ID
+            string a[];
+            string b[];
+            strsplit(a, Lines[Selected], '\t'); // Column 5 Lines[] contains the part-id!
+            int n = strsplit(b, a[4], ',');     // First part in list
+            string partname = b[0];
+            
+            // we have to strip off any (DNP) suffix from the part name
+            partname = TrimDNPSuffix(partname);
+            EditPartEntry(partname);
+           
+            int pt0 = PartSearch(partname);
+            
+            if (PartNumPicked && (n>1) && (pt0>-1))
+            {
+                for(int i=1; i<n; i++)
+                {
+                    partname = b[i];
+                    partname = TrimWhiteSpace(partname);
+                    partname = TrimDNPSuffix(partname);
+                    
+                    int ndx = PartSearch(partname);
+                    //partname += "|";
+                    //dlgMessageBox(partname);
+                    if(ndx > -1)
+                    {
+                        PartNum[ndx] = PartNum[pt0];    
+                        PartVal[ndx] = PickPartVal; //[pt0];
+                        PartDevChange[ndx] = PickPartDev; //[pt0];
+                    }
+                }
+                GenerateList();
+            }
+        }
+        else
+        {
+            dlgMessageBox("Please select a part from the list!");
+        }
+    }
+}
+        
+void ClearPartNumberSet(void)
+{
+    if (!nPartCount)
+    {
+        dlgMessageBox("No Parts Found!");
+        return;
+    }
+
+    if (Selected < 0)
+    {
+        dlgMessageBox("Please select a part from the list!");
+        return;
+    }
+
+    if (ListType == ltParts)
+    {
+        // NOTE: THE VIEW COL NUM FOR a[n] MUST CORRESPOND TO THE PART ID
+        string a[];
+        strsplit(a, Lines[Selected], '\t');
+        // Column 1 Lines[] contains the part-id!
+        string partname = a[0];
+        // we have to strip off any (DNP) suffix from the part name
+        partname = TrimDNPSuffix(partname);
+
+        int ndx = PartSearch(partname);
+        if (ndx == -1)
+        {
+            string msg;
+            sprintf(msg, "Error - part ID '%s' not found!", partname);
+            dlgMessageBox(msg, "OK");
+            return;
+        }
+        else
+        {
+            PartNum[ndx] = "*";
+            PartNumModified = 1;
+        }
+        GenerateList();
+    }
+    else
+    {    
+        // NOTE: THE VIEW COL NUM FOR a[n] MUST CORRESPOND TO THE PART ID
+        string a[];
+        string b[];
+        strsplit(a, Lines[Selected], '\t'); // Column 5 Lines[] contains the part-id!
+        int n = strsplit(b, a[4], ',');     // First part in list
+        string partname;
+
+        if (n > 0)
+        {
+            for(int i=0; i < n; i++)
+            {
+                partname = b[i];
+                // we have to strip off any (DNP) suffix from the part name
+                partname = TrimWhiteSpace(partname);
+                partname = TrimDNPSuffix(partname);
+
+                int ndx = PartSearch(partname);
+                
+                if (ndx >= 0)
+                {
+                    PartNum[ndx] = "*";
+                    PartNumModified = 1;
+                }
+                else
+                {
+                    string msg;
+                    sprintf(msg, "Error - part ID '%s' not found!", partname);
+                    dlgMessageBox(msg, "OK");
+                    break;
+                }
+            }
+            
+            GenerateList();
+        }
+    }
+}
+
+void ClearAllPartNumbers(void)
+{
+    if (dlgMessageBox("This will clear ALL part number attributes currently assigned in the schematic.\n\nAre you really sure you want to do this?", "+&Yes", "&No") > 0)
+        return;
+
+    for (int i=0; i < nPartCount; i++)
+        PartNum[i] = nullKey;
+        
+    PartNumModified = 1;
+    
+    GenerateList();
+}
+
+
+//////////////////////////////////////////////////////////////////////////////
+// The part database requires the following database fields to support
+// exporting supplier BOM order files. Additionally, the first column
+// must always contain the manufacturer part number. You may add additional
+// fields to the database record stucture, but the following fields are
+// required and must be named as follows (except those marked as optional).
+//
+//  Col   Field Name                    Description
+//  -------------------------------------------------------------------
+//   0    "Part Num"            PARTNUM key for schematic
+//   1    "Mfg Name"            Manufacurer name for the part
+//   2    "VID"                 "DK" for Digikey Corp
+//                              "ME" for Mouser Electronics
+//                              "AE" for Allied Electronics
+//   3    "Vendor Part Num"     Specifies vendor part number
+//   4    "Description"         Optional - nice to have
+//   5    "Pkg Code"            Optional - package check name (0805, etc)
+//
+// Note that the "Qty 1" field is calculated automatically from the number
+// of parts in schematic and specifies the qty required to build a single unit.
+//
+
+string BOMDatabaseLookup(string key, string colname)
+{
+    // First make sure the field name exists in header. If not we
+    // don't attempt to lookup or we'll get an error message dialog
+    // from Eagle and the ulp will terminate.
+
+    string a[];
+    int n = strsplit(a, Database[0], DatabaseSeparator);
+    int found = 0;
+    for (int i=0; i < n; i++)
+    {
+        if (colname == a[i])
+        {
+            found = 1;
+            break;
+        }
+    }
+
+    if (!found)
+        return nullKey;
+
+    // Field name exists, attempt to lookup the key
+
+    string val = lookup(Database, key, colname, DatabaseSeparator);
+
+    if (!val || (val == colname))
+        val = nullKey;
+
+    return val;
+}
+
+// This function return the column number by name of the database file.
+// It returnes -1 if the columne name was not found.
+
+int GetDatabaseColumn(string colname)
+{
+    string a[];
+    int n = strsplit(a, Database[0], DatabaseSeparator);
+    
+    int found = -1;
+    
+    for (int i=0; i < n; i++)
+    {
+        if (colname == a[i])
+        {
+            found = i;
+            break;
+        }
+    }
+    return found;
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// Package and Value Checking Functions
+
+void PackageCheck()
+{
+    int result = 0;
+    int nsel = 0;
+    int count = 0;
+    int good = 0;
+    
+    numeric string PackageView[];
+        
+    if (Database[0])
+    {
+        if (GetDatabaseColumn("Pkg Code") == -1)
+        {
+            string msg = "The part database does not contain a 'Pkg Code' column with package codes!\n"
+                         "You must add package codes (eg 0402, 0805, etc) in your database file\n"
+                         "that you want to validate against the parts in your design!";    
+            dlgMessageBox(msg, "OK");    
+            return;
+        }
+
+        string temp;
+        sprintf(temp, "Part\tDev Pkg\tPkg Code\tDescription");
+        PackageView[count++] = temp;
+        
+        for (int i=0; i < nPartCount; i++)
+        {
+            // skip if part device has no package
+            if (PartPkg[i] == nullKey)
+                continue;
+
+            string key = GetKey(i);
+            string pkg = BOMDatabaseLookup(key, "Pkg Code");
+            string desc = BOMDatabaseLookup(key, "Description");
+            
+            // skip if no package specified in database
+            if (pkg == "" || pkg == nullKey)
+                continue;
+                
+            // okay if pkg names are exact match
+            if (pkg == PartPkg[i])
+            {
+                ++good;
+                continue;
+            }
+
+            // log warning if substring of database package not found in device package name
+            if (strstr(PartPkg[i], pkg) >= 0)
+            {
+                ++good;
+                continue;
+            }
+
+            // Otherwise issue a possible package warning for the part                
+            sprintf(temp, "%s\t%s\t%s\t%s", PartName[i], PartPkg[i], pkg, desc);
+            PackageView[count++] = temp;
+        }
+
+        result = dlgDialog("Package Code Checker")
+        {
+            dlgHBoxLayout dlgSpacing(600);
+            {
+                dlgListView("", PackageView, nsel)
+                {
+                }
+            }
+            dlgHBoxLayout
+            {
+                --count;
+                string temp;
+                if (!count)
+                    sprintf(temp, "%d parts checked, no package conflicts detected!", good); 
+                else
+                    sprintf(temp, "WARNING: %d possible package conflicts detected!", count); 
+                dlgLabel(temp, 1);
+                dlgStretch(1);
+                dlgPushButton("-Close")  dlgReject();
+            }
+        };
+    }
+}
+
+void PackageList()
+{
+    int result = 0;
+    int nsel = 0;
+    int count = 0;
+    
+    numeric string PackageView[];
+        
+    if (Database[0])
+    {
+        if (GetDatabaseColumn("Pkg Code") == -1)
+        {
+            string msg = "The part database does not contain a 'Pkg Code' column with package codes!\n"
+                         "You must add package codes (eg 0402, 0805, etc) in your database file\n"
+                         "that you want to validate against the parts in your design!";    
+            dlgMessageBox(msg, "OK");    
+            return;
+        }
+
+        string temp;
+        sprintf(temp, "Part\tDev Pkg\tPkg Code\tDescription");
+        PackageView[count++] = temp;
+        
+        for (int i=0; i < nPartCount; i++)
+        {
+            // skip if part device has no package
+            if (PartPkg[i] == nullKey)
+                continue;
+
+            string key = GetKey(i);
+            string pkg = BOMDatabaseLookup(key, "Pkg Code");
+            string desc = BOMDatabaseLookup(key, "Description");
+                
+            // Otherwise issue a possible package warning for the part                
+            sprintf(temp, "%s\t%s\t%s\t%s", PartName[i], PartPkg[i], pkg, desc);
+            PackageView[count++] = temp;
+        }
+
+        result = dlgDialog("Package List")
+        {
+            dlgHBoxLayout dlgSpacing(600);
+            {
+                dlgListView("", PackageView, nsel)
+                {
+                }
+            }
+            dlgHBoxLayout
+            {
+                --count;
+                if (count)
+                {
+                    string temp;
+                    sprintf(temp, "%d parts listed", count); 
+                    dlgLabel(temp, 1);
+                    dlgStretch(1);
+                }
+                dlgPushButton("-Close")  dlgReject();
+            }
+        };
+    }
+}
+
+void ValueCheck()
+{
+    int result = 0;
+    int nsel = 0;
+    int count = 0;
+    int good = 0;
+    
+    numeric string ValueView[];
+        
+    if (Database[0])
+    {
+        string temp;
+        sprintf(temp, "Part\tValue\tDescription");
+        ValueView[count++] = temp;
+        
+        for (int i=0; i < nPartCount; i++)
+        {
+            string key  = GetKey(i);
+            string val  = strupr(PartVal[i]);
+            string desc = strupr(BOMDatabaseLookup(key, "Description"));
+            
+            // skip if no package specified in database
+            if (desc == "" || val == "" || val == nullKey)
+                continue;
+
+            // If the part value and part number match, we can
+            // safely assume it's not a part with a real "value"
+            // like a resistor, cap, diode, etc. Note we also
+            // compare partnum as a substring of the value.
+            if (val == PartNum[i])
+                continue;
+            if (strstr(PartNum[i], val) >= 0)
+                continue;
+            
+            // If the part value substring is found in the part description,
+            // then assume the value match is good.        
+            if (strstr(desc, val) >= 0)
+            {
+                ++good;
+                continue;
+            }
+
+            // Check part "Values" that are space delimited (eg "1k 1%"), break these
+            // int tokens and search for each token separately.
+            string a[];
+            int token=0;
+            int n = strsplit(a, val, ' ');
+            if (n > 0)
+            {
+                int i;
+                for (i=0; i < n; i++)
+                {
+                    if (strstr(desc, a[i]) >= 0)
+                        ++token;
+                }
+                if (token == n)
+                {
+                    ++good;
+                    continue;
+                }
+            }
+
+            // Otherwise, log a warning if substring of value is found in database part description
+            sprintf(temp, "%s\t%s\t%s", PartName[i], val, desc);
+            ValueView[count++] = temp;
+        }
+
+        result = dlgDialog("Part Value Checker")
+        {
+            dlgHBoxLayout dlgSpacing(600);
+            {
+                dlgListView("", ValueView, nsel)
+                {
+                }
+            }
+            dlgHBoxLayout
+            {
+                --count;
+                string temp;
+                if (!count)
+                    sprintf(temp, "%d part values checked, no value conflicts detected!", good); 
+                else
+                    sprintf(temp, "WARNING: %d possible part value conflicts found!", count); 
+                dlgLabel(temp, 0);
+                dlgStretch(1);
+                dlgPushButton("-Close")  dlgReject();
+            }
+        };
+    }
+}
+
+
+//////////////////////////////////////////////////////////////////////////////
+// Export a generic BOM parts order file for all parts.
+
+int ExportGeneric()
+{
+    int csvflag = 1;
+    int unkflag = 0;
+    int incflag = 0;
+    int sortByPartNum = 1;
+    
+    int result = dlgDialog("Export Generic BOM")
+    {
+        dlgHBoxLayout
+        {
+            dlgGroup("Export BOM")
+            {
+                dlgGridLayout
+                {
+                    dlgCell(1,0) dlgLabel("Build Units Quantity");
+                    dlgCell(1,1) dlgIntEdit(BldQty1, 1, 1000);
+                }
+
+                dlgGroup("File Format")
+                {
+                    dlgRadioButton("&TAB delimited text format", csvflag);
+                    dlgRadioButton("&CSV comma separated fields", csvflag);
+                }
+
+                dlgCheckBox("Export unknown vendors only", unkflag);
+                dlgCheckBox("Include parts marked as DNP also", incflag);
+                dlgCheckBox("Sort by PartNum only (ignore part value)", sortByPartNum);                
+            }
+
+            dlgVBoxLayout
+            {
+                dlgStretch(1);
+                dlgPushButton("+OK") dlgAccept();
+                dlgPushButton("-Cancel") dlgReject();
+            }
+        }
+    };
+
+    if (!result)
+        return -1;
+
+    string fname;
+    string extname = (csvflag) ? ".csv" : ".txt";
+    string delimit = (csvflag) ?  "," : "\t";
+    string fnext;
+
+    if (unkflag)
+        fnext = "_BOMUnknownVendors"+extname;
+    else
+        fnext = "_BOM"+extname;
+
+    fname = filesetext(ConfigFilePath+DefaultFileName, fnext);
+
+    fname = dlgFileSave("Export BOM", fname, "BOM files (*" + extname + ");;All files (*)");
+
+    if (!fname)
+        return -1;
+    if (fileext(fname) != extname)
+        fname += extname;
+
+    fileerror();
+
+    int records = 0;
+
+    output(fname, "wt")
+    {
+        int fcount, i;
+        int i1, n1, n2;
+        int numlines = 0;
+        int index[];
+
+        printf("Qty-%d%sPart References%sValue%sPackage%s", BldQty1, delimit, delimit, delimit, delimit);
+        
+        // print out the inital header line of the column descriptions
+        // for all database header fields.
+
+        string fields[];
+        fcount = strsplit(fields, Database[0], DatabaseSeparator);
+        
+        for (i=0; i < fcount; i++)
+        {
+            printf(fields[i]);
+            if (i < fcount-1)
+                printf(delimit);
+        }
+
+        printf("\n");
+
+        // sort by part value
+        sort(nPartCount, index, PartVal, PartNum, PartDev, PartName);
+
+        for (n1=0, n2=0; ++n2 <= nPartCount;)
+        {
+            i1 = index[n1];
+
+            if (n2 < nPartCount)
+            {
+                int i2 = index[n2];
+                // [RES155] check for different partnum only
+                if (sortByPartNum)
+                {
+                    if ((strlen(PartNum[i1]) == 0) || (strlen(PartNum[i2]) == 0))
+                        continue;
+                    if (PartNum[i1] == PartNum[i2])
+                        continue;
+                }
+                else
+                {                
+                    // [RES144] check for same value but different partnum
+                    if ((PartVal[i1] == PartVal[i2]) && (PartDev[i1] == PartDev[i2]))
+                    {
+                        if (strlen(PartNum[i1]) && strlen(PartNum[i2]))
+                        {
+                            if (PartNum[i1] == PartNum[i2])
+                                continue;
+                        }
+                        else
+                        {
+                            continue;
+                        }
+                    }
+                }
+            }
+
+            // Calculate the qty of parts needed to build one unit.
+            int uqty = n2 - n1;
+
+            if (PartQty[i1])
+                uqty = PartQty[i1];
+
+            // Build a list of all part reference designators to this part number
+            // for debugging purposes in case a part number is not specified or
+            // the part number lookup fails. We dump all the part refs in case
+            // of an error so we can figure out which items have bad partno's.
+
+            numeric string partnames = "\"";
+
+            for (;;)
+            {
+                partnames += PartName[i1];
+
+                // Skip do not place (DNP) parts
+
+                if (PartDNP[i1])
+                {
+                    partnames += dnpSuffix;
+
+                    if (uqty && (incflag == 0))
+                        -- uqty;
+                }
+
+                ++n1;
+
+                if (n1 < n2)
+                {
+                    i1 = index[n1];
+                    partnames += ", ";
+                }
+                else
+                    break;
+            }
+            
+            partnames += "\"";
+            
+            // Look up the supplier part number from mfg part number, column
+            // zero should always be the manufacturer part number key
+
+            int errflag = 0;
+
+            string partno_key = PartNum[i1];
+            string part_value = PartVal[i1];
+            string part_pkg   = PartPkg[i1];            
+
+            if (!partno_key)
+            {
+                printf("*** ERROR - MISSING '%s' ATTRIBUTE: %s\n", strPartNumAttrName, PartName[i1]);
+            }
+            else
+            {
+                string item = BOMDatabaseLookup(partno_key, fields[0]);
+
+                // Lookup the vendor ID based on the mfg part number
+                if (unkflag)
+                {
+                    string vendor_id = BOMDatabaseLookup(partno_key, "VID");
+                    
+                    if (vendor_id == "DK" || vendor_id == "ME" || vendor_id == "AE")
+                        continue;
+                }
+
+                numeric string quantity1;
+                sprintf(quantity1, "%d", uqty * BldQty1);
+                
+                printf("%s%s%s%s%s%s%s%s", quantity1, delimit, partnames, delimit, part_value, delimit, part_pkg, delimit);
+
+                if (!item || (item == nullKey))
+                    printf("***PART# '%s' NOT FOUND***%s", partno_key, delimit);
+                else
+                    printf("%s%s", partno_key, delimit);
+                
+                for (i=1; i < fcount; i++)
+                {
+                    string item = BOMDatabaseLookup(partno_key, fields[i]);
+                    printf("%s", item);
+
+                    if (i < fcount-1)
+                        printf(delimit);
+                }
+
+                printf("\n");
+
+                records++;
+            }
+
+            numlines++;
+        }
+    };
+
+    if (fileerror())
+        dlgMessageBox("A file error occured!");
+
+    return records;
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// Export a Digi-Key format upload BOM in CSV or TAB format
+//
+// Note that the "Qty 1" field is calculated automatically from the number
+// of parts in schematic and specifies the qty required to build a single unit.
+//
+// The "Qty 2" and "Qty 3" fields are user specified bulk quantities
+// that will be generated in the order upload file.
+//
+// VID must be set to "DK"
+
+string strDKFields[] = {
+    "Digi-Key Part No.",          // field 0
+    "Manufacturer Name",          // field 1
+    "Mfr Part No.",               // field 2
+    "Customer Reference",         // field 3
+    "Qty1",                       // field 4
+    ""                            // null
+};
+
+int ExportDigiKey()
+{
+    int csvflag = 1;
+    int incflag = 0;
+    int sortByPartNum = 1;
+
+    int result = dlgDialog("Export Digi-Key Parts Order")
+    {
+        dlgHBoxLayout
+        {
+            dlgGroup("Export BOM")
+            {
+                dlgGridLayout
+                {
+                    dlgCell(1,0) dlgLabel("Build Units Quantity");
+                    dlgCell(1,1) dlgIntEdit(BldQty1, 1, 1000);
+                }
+                dlgGroup("File Format")
+                {
+                    dlgRadioButton("&TAB delimited text format", csvflag);
+                    dlgRadioButton("&CSV comma separated fields", csvflag);
+                }
+                dlgCheckBox("Include parts marked as DNP in order also", incflag);
+                dlgCheckBox("Sort by PartNum only (ignore part value)", sortByPartNum);
+            }
+            dlgVBoxLayout
+            {
+                dlgStretch(1);
+                dlgPushButton("+OK") dlgAccept();
+                dlgPushButton("-Cancel") dlgReject();
+            }
+        }
+    };
+
+    if (!result)
+        return -1;
+
+    string fname;
+    string extname = (csvflag) ? ".csv" : ".txt";
+    string delimit = (csvflag) ?  "," : "\t";
+
+    fname = filesetext(ConfigFilePath+DefaultFileName, "_OrderUploadDigiKey"+extname);
+
+    fname = dlgFileSave("Export Digi-Key BOM", fname, "BOM files (*" + extname + ");;All files (*)");
+
+    if (!fname)
+        return -1;
+
+    if (fileext(fname) != extname)
+        fname += extname;
+
+    fileerror();
+
+    int records = 0;
+
+    output(fname, "wt")
+    {
+        int i, i1, n1, n2;
+        int numlines = 0;
+        int index[];
+
+        // print out the inital header line of the column descriptions
+        printf("%s\n", strjoin(strDKFields, delimit[0]));
+
+        // sort by part value
+        if (sortByPartNum)
+            sort(nPartCount, index, PartNum);
+        else        
+            sort(nPartCount, index, PartVal, PartNum, PartDev, PartName);
+
+        for (n1=0, n2=0; ++n2 <= nPartCount;)
+        {
+            i1 = index[n1];
+
+            if (n2 < nPartCount)
+            {
+                int i2 = index[n2];
+                // [RES155] check for different partnum only
+                if (sortByPartNum)
+                {
+                    if ((strlen(PartNum[i1]) == 0) || (strlen(PartNum[i2]) == 0))
+                        continue;
+                    if (PartNum[i1] == PartNum[i2])
+                        continue;
+                }
+                else
+                {                
+                    // [RES144] check for same value but different partnum
+                    if ((PartVal[i1] == PartVal[i2]) && (PartDev[i1] == PartDev[i2]))
+                    {
+                        if (strlen(PartNum[i1]) && strlen(PartNum[i2]))
+                        {
+                            if (PartNum[i1] == PartNum[i2])
+                                continue;
+                        }
+                        else
+                        {
+                            continue;
+                        }
+                    }
+                }
+            }
+
+            // Calculate the qty of parts needed to build one unit.
+            int uqty = n2 - n1;
+
+            if (PartQty[i1])
+                uqty = PartQty[i1];
+
+            // Build a list of all part reference designators to this part number
+            // for debugging purposes in case a part number is not specified or
+            // the part number lookup fails. We dump all the part refs in case
+            // of an error so we can figure out which items have bad partno's.
+
+            numeric string partnames;
+
+            for (;;)
+            {
+                partnames += PartName[i1];
+
+                // Skip do not place (DNP) parts
+                if (PartDNP[i1])
+                {
+                    if (uqty && (incflag == 0))
+                        -- uqty;
+                }
+
+                if (++n1 < n2)
+                {
+                    i1 = index[n1];
+                    partnames += "/";
+                }
+                else
+                    break;
+            }
+
+            if (!uqty)
+                continue;
+
+            // Look up the supplier part number from mfg part number, column
+            // zero should always be the manufacturer part number key
+
+            int errflag = 0;
+
+            string part_num = PartNum[i1];
+            string partno_dk;
+            string cust_ref;
+            string vendor_id;
+            string mfg_name;
+            numeric string quantity1;
+
+            if (!part_num)
+            {
+                printf("*** ERROR - MISSING '%s' ATTRIBUTE: %s\n", strPartNumAttrName, PartName[i1]);
+            }
+            else
+            {
+                // Look up vendor part number in database from the mfg part number.
+                partno_dk = BOMDatabaseLookup(part_num, "Vendor Part Num");
+
+                if (partno_dk == nullKey)
+                    errflag = 1;
+
+                // Lookup the customer reference number for this part
+                cust_ref  = BOMDatabaseLookup(part_num, "XREF");
+
+                if (cust_ref == nullKey)
+                    cust_ref = partnames;
+
+                // Lookup the vendor ID based on the mfg part number - must be "DK"
+                vendor_id = BOMDatabaseLookup(part_num, "VID");
+
+                // Lookup the manufacturer name based on the mfg part number
+                mfg_name  = BOMDatabaseLookup(part_num, "Mfg Name");
+
+                // Lookup first bulk quantity value
+                quantity1 = BOMDatabaseLookup(part_num, "Qty 1");
+                if (quantity1 == nullKey)
+                {
+                    sprintf(quantity1, "%d", uqty * BldQty1);
+                }
+            }
+
+            // Only output parts with DigiKey vendor id "DK"
+
+            if ((vendor_id == "DK") || (vendor_id == nullKey))
+            {
+                printf("%s%s", partno_dk, delimit);
+                printf("%s%s", mfg_name, delimit);
+                printf("%s%s", part_num, delimit);
+                printf("%s%s", cust_ref, delimit);
+                printf("%s%s", quantity1, delimit);
+
+                if (errflag)
+                    printf("*** PART# '%s' NOT FOUND : %s", part_num, partnames);
+
+                printf("\n");
+
+                records++;
+            }
+
+            numlines++;
+        }
+    };
+
+    if (fileerror())
+        dlgMessageBox("A file error occured!");
+
+    return records;
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// Export a Allied Electronics BOM formatted file in text format.
+//
+// VID must be set to "AE"
+//
+
+string strAEFields[] = {
+    "Allied Part Number",         // field 0
+    "Manufacturer Name",          // field 1
+    "Mfr Part No.",               // field 2
+    "Customer Reference",         // field 3
+    "Qty1",                       // field 4
+    ""                            // null
+};
+
+int ExportAllied()
+{
+    int csvflag = 1;
+    int incflag = 0;
+    int sortByPartNum = 1;
+    
+    int result = dlgDialog("Export Allied Parts Order")
+    {
+        dlgHBoxLayout
+        {
+            dlgGroup("Export BOM")
+            {
+                dlgGridLayout
+                {
+                    dlgCell(1,0) dlgLabel("Build Units Quantity");
+                    dlgCell(1,1) dlgIntEdit(BldQty1, 1, 1000);
+                }
+                dlgGroup("File Format")
+                {
+                    dlgRadioButton("&TAB delimited text format", csvflag);
+                    dlgRadioButton("&CSV comma separated fields", csvflag);
+                }
+                dlgCheckBox("Include parts marked as DNP in order also", incflag);
+                dlgCheckBox("Sort by PartNum only (ignore part value)", sortByPartNum);                
+            }
+            dlgVBoxLayout
+            {
+                dlgStretch(1);
+                dlgPushButton("+OK") dlgAccept();
+                dlgPushButton("-Cancel") dlgReject();
+            }
+        }
+    };
+
+    if (!result)
+        return -1;
+
+    string fname;
+    string extname = (csvflag) ? ".csv" : ".txt";
+    string delimit = (csvflag) ?  "," : "\t";
+
+    fname = filesetext(ConfigFilePath+DefaultFileName, "_OrderUploadAllied"+extname);
+
+    fname = dlgFileSave("Export Digi-Key BOM", fname, "BOM files (*" + extname + ");;All files (*)");
+
+    if (!fname)
+        return -1;
+
+    if (fileext(fname) != extname)
+        fname += extname;
+
+    fileerror();
+
+    int records = 0;
+
+    output(fname, "wt")
+    {
+        int i, i1, n1, n2;
+        int numlines = 0;
+        int index[];
+
+        // print out the inital header line of the column descriptions
+        printf("%s\n", strjoin(strAEFields, delimit[0]));
+
+        // sort by part value
+        sort(nPartCount, index, PartVal, PartNum, PartDev, PartName);
+
+        for (n1=0, n2=0; ++n2 <= nPartCount;)
+        {
+            i1 = index[n1];
+
+            if (n2 < nPartCount)
+            {
+                int i2 = index[n2];
+                // [RES155] check for different partnum only
+                if (sortByPartNum)
+                {
+                    if ((strlen(PartNum[i1]) == 0) || (strlen(PartNum[i2]) == 0))
+                        continue;
+                    if (PartNum[i1] == PartNum[i2])
+                        continue;
+                }
+                else
+                {                
+                    // [RES144] check for same value but different partnum
+                    if ((PartVal[i1] == PartVal[i2]) && (PartDev[i1] == PartDev[i2]))
+                    {
+                        if (strlen(PartNum[i1]) && strlen(PartNum[i2]))
+                        {
+                            if (PartNum[i1] == PartNum[i2])
+                                continue;
+                        }
+                        else
+                        {
+                            continue;
+                        }
+                    }
+                }
+            }
+
+            // Calculate the qty of parts needed to build one unit.
+            int uqty = n2 - n1;
+
+            if (PartQty[i1])
+                uqty = PartQty[i1];
+
+            // Build a list of all part reference designators to this part number
+            // for debugging purposes in case a part number is not specified or
+            // the part number lookup fails. We dump all the part refs in case
+            // of an error so we can figure out which items have bad partno's.
+
+            numeric string partnames;
+
+            for (;;)
+            {
+                partnames += PartName[i1];
+
+                // Skip do not place (DNP) parts
+                if (PartDNP[i1])
+                {
+                    if (uqty && (incflag == 0))
+                        -- uqty;
+                }
+
+                if (++n1 < n2)
+                {
+                    i1 = index[n1];
+                    partnames += "/";
+                }
+                else
+                    break;
+            }
+
+            if (!uqty)
+                continue;
+
+            // Look up the supplier part number from mfg part number, column
+            // zero should always be the manufacturer part number key
+
+            int errflag = 0;
+
+            string part_num = PartNum[i1];
+            string partno_dk;
+            string cust_ref;
+            string vendor_id;
+            string mfg_name;
+            numeric string quantity1;
+
+            if (!part_num)
+            {
+                printf("*** ERROR - MISSING '%s' ATTRIBUTE: %s\n", strPartNumAttrName, PartName[i1]);
+            }
+            else
+            {
+                // Look up vendor part number in database from the mfg part number.
+                partno_dk = BOMDatabaseLookup(part_num, "Vendor Part Num");
+
+                if (partno_dk == nullKey)
+                    errflag = 1;
+
+                // Lookup the customer reference number for this part
+                cust_ref  = BOMDatabaseLookup(part_num, "XREF");
+
+                // Lookup the vendor ID based on the mfg part number - must be "DK"
+                vendor_id = BOMDatabaseLookup(part_num, "VID");
+
+                // Lookup the manufacturer name based on the mfg part number
+                mfg_name  = BOMDatabaseLookup(part_num, "Mfg Name");
+
+                // Lookup the first bulk quantity value
+                quantity1 = BOMDatabaseLookup(part_num, "Qty 1");
+                if (quantity1 == nullKey)
+                {
+                    sprintf(quantity1, "%d", uqty * BldQty1);
+                }
+            }
+
+            // Only output parts with DigiKey vendor id "DK"
+
+            if ((vendor_id == "AE") || (vendor_id == nullKey))
+            {
+                printf("%s%s", partno_dk, delimit);
+                printf("%s%s", mfg_name, delimit);
+                printf("%s%s", part_num, delimit);
+                printf("%s%s", cust_ref, delimit);
+                printf("%s%s", quantity1, delimit);
+
+                if (errflag)
+                    printf("*** PART# '%s' NOT FOUND : %s", part_num, partnames);
+
+                printf("\n");
+
+                records++;
+            }
+
+            numlines++;
+        }
+    };
+
+    if (fileerror())
+        dlgMessageBox("A file error occured!");
+
+    return records;
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// Export a Mouser Electronics BOM formatted file in text format. Currently
+// the Mouser site doesn't provide a file upload feature, however it does
+// let you cut/paste part numbers into a form on their website. This
+// routine generates a file in this format that you can paste the results
+// from.
+//
+// VID must be set to "ME"
+//
+
+int ExportMouserTXT()
+{
+    int optnum = 0;
+    int incflag = 0;
+    int sortByPartNum = 1;
+            
+    int result = dlgDialog("Export Mouser Parts Order")
+    {
+        dlgHBoxLayout
+        {
+            dlgGroup("Export TXT BOM")
+            {
+                dlgGridLayout
+                {
+                    dlgCell(1,0) dlgLabel("Build Units Quantity");
+                    dlgCell(1,1) dlgIntEdit(BldQty1, 1, 1000);
+                }
+               dlgGroup("Options")
+                {
+                    dlgRadioButton("Mouser Part Numbers", optnum);
+                    dlgRadioButton("Manufacturer Part Numbers", optnum);
+                }    
+                dlgCheckBox("Include parts marked as DNP in order also", incflag);
+                dlgCheckBox("Sort by PartNum only (ignore part value)", sortByPartNum);
+            }
+        }
+        dlgHBoxLayout
+        {
+            dlgHBoxLayout
+            {
+                dlgStretch(1);
+                dlgPushButton("+OK") dlgAccept();
+                dlgPushButton("-Cancel") dlgReject();
+            }
+        }
+    };
+
+    if (!result)
+        return -1;
+
+    string line;
+    string fname;
+    string extname = ".txt";
+
+    //ConfigFilePath
+    fname = filesetext(ConfigFilePath+DefaultFileName, "_OrderUploadMouser"+extname);
+
+    fname = dlgFileSave("Export Mouser BOM", fname, "BOM files (*" + extname + ");;All files (*)");
+
+    if (!fname)
+        return -1;
+
+    if (fileext(fname) != extname)
+        fname += extname;
+
+    fileerror();
+
+    int records = 0;
+
+    output(fname, "wt")
+    {
+        int i, i1, n1, n2;
+        int numlines = 0;
+        int index[];
+
+        // sort by part value
+        sort(nPartCount, index, PartVal, PartNum, PartDev, PartName);
+
+        for (n1=0, n2=0; ++n2 <= nPartCount;)
+        {
+            i1 = index[n1];
+
+            if (n2 < nPartCount)
+            {
+                int i2 = index[n2];
+               // [RES155] check for different partnum only
+                if (sortByPartNum)
+                {
+                    if ((strlen(PartNum[i1]) == 0) || (strlen(PartNum[i2]) == 0))
+                        continue;
+                    if (PartNum[i1] == PartNum[i2])
+                        continue;
+                }
+                else
+                {                
+                    // [RES144] check for same value but different partnum
+                    if ((PartVal[i1] == PartVal[i2]) && (PartDev[i1] == PartDev[i2]))
+                    {
+                        if (strlen(PartNum[i1]) && strlen(PartNum[i2]))
+                        {
+                            if (PartNum[i1] == PartNum[i2])
+                                continue;
+                        }
+                        else
+                        {
+                            continue;
+                        }
+                    }
+                }
+            }
+
+            // Calculate the qty of parts needed to build one unit.
+            int uqty = n2 - n1;
+
+            if (PartQty[i1])
+                uqty = PartQty[i1];
+
+            // Build a list of all part reference designators to this part number
+            // for debugging purposes in case a part number is not specified or
+            // the part number lookup fails. We dump all the part refs in case
+            // of an error so we can figure out which items have bad partno's.
+
+            numeric string partnames;
+
+            for (;;)
+            {
+                partnames += PartName[i1];
+
+                // Skip do not place (DNP) parts
+                if (PartDNP[i1])
+                {
+                    if (uqty && (incflag == 0))
+                        -- uqty;
+                }
+
+                if (++n1 < n2)
+                {
+                    i1 = index[n1];
+                    partnames += "/";
+                }
+                else
+                    break;
+            }
+
+            if (!uqty)
+                continue;
+
+            // Look up the supplier part number from mfg part number, column
+            // zero should always be the manufacturer part number key
+
+            int errflag = 0;
+
+            string part_num = PartNum[i1];
+            string partno_vendor;
+            string vendor_id;
+            string qty1;
+
+            numeric string quantity1;
+
+            sprintf(quantity1, "%d", n2 - n1);
+
+            if (!part_num)
+            {
+                printf("*** ERROR - MISSING '%s' ATTRIBUTE: %s\n", strPartNumAttrName, PartName[i1]);
+            }
+            else
+            {
+                // Look up vendor part number in database from the mfg part number.
+                partno_vendor = BOMDatabaseLookup(part_num, "Vendor Part Num");
+
+                if (partno_vendor == nullKey)
+                    errflag = 1;
+
+                // Lookup the vendor ID based on the mfg part number - must be "DK"
+                vendor_id = BOMDatabaseLookup(part_num, "VID");
+
+                // If user specified qty1, use that. Otherwise use the calculated
+                // quantity for the design based on the parts count.
+
+                quantity1 = BOMDatabaseLookup(part_num, "Qty 1");
+
+                if (quantity1 == nullKey)
+                {
+                    sprintf(quantity1, "%d", uqty * BldQty1);
+                }
+            }
+
+            // Only output parts with Mouser vendor id "ME"
+
+            if ((vendor_id == "ME") || (vendor_id == nullKey))
+            {
+                string qty;
+
+                string partno = (optnum > 0) ? part_num : partno_vendor;
+
+                printf("%s|%s", partno, quantity1);
+
+                if (errflag)
+                    printf(" *** ERROR : %s", partnames);
+
+                printf("\n");
+
+                records++;
+            }
+
+            numlines++;
+        }
+    };
+
+    if (fileerror())
+        dlgMessageBox("A file error occured!");
+
+    return records;
+}
+
+
+string strMEFields[] = {
+    "quantity 1",                 // field 0
+    "Mfg Part Number",            // field 1
+    "Mfg Name",                   // field 2
+    "Mouser Part Number",         // field 3
+    "Ref-ID",                     // field 4
+    ""                            // null
+};
+
+int ExportMouserCSV()
+{
+    int incflag = 0;
+    int sortByPartNum = 1;
+
+    int result = dlgDialog("Export Mouser Parts Order")
+    {
+        dlgHBoxLayout
+        {
+            dlgGroup("Export BOM")
+            {
+                dlgGridLayout
+                {
+                    dlgCell(1,0) dlgLabel("Build Units Quantity");
+                    dlgCell(1,1) dlgIntEdit(BldQty1, 1, 1000);
+                }
+
+                dlgCheckBox("Include parts marked as DNP in order also", incflag);
+                dlgCheckBox("Sort by PartNum only (ignore part value)", sortByPartNum);
+            }
+            
+            dlgVBoxLayout
+            {
+                dlgStretch(1);
+                dlgPushButton("+OK") dlgAccept();
+                dlgPushButton("-Cancel") dlgReject();
+            }
+        }
+    };
+
+    if (!result)
+        return -1;
+
+    string fname;
+    string extname = ".csv";
+    string delimit = ",";
+
+    fname = filesetext(ConfigFilePath+DefaultFileName, "_OrderUploadMouser"+extname);
+
+    fname = dlgFileSave("Export Mouser BOM", fname, "BOM files (*" + extname + ");;All files (*)");
+
+    if (!fname)
+        return -1;
+
+    if (fileext(fname) != extname)
+        fname += extname;
+
+    fileerror();
+
+    int records = 0;
+
+    output(fname, "wt")
+    {
+        int i, i1, n1, n2;
+        int numlines = 0;
+        int index[];
+
+        // print out the inital header line of the column descriptions
+        printf("%s\n", strjoin(strMEFields, delimit[0]));
+
+        // sort by part value
+        sort(nPartCount, index, PartVal, PartNum, PartDev, PartName);
+
+        for (n1=0, n2=0; ++n2 <= nPartCount;)
+        {
+            i1 = index[n1];
+
+            if (n2 < nPartCount)
+            {
+                int i2 = index[n2];
+                // [RES155] check for different partnum only
+                if (sortByPartNum)
+                {
+                    if ((strlen(PartNum[i1]) == 0) || (strlen(PartNum[i2]) == 0))
+                        continue;
+                    if (PartNum[i1] == PartNum[i2])
+                        continue;
+                }
+                else
+                {                
+                    // [RES144] check for same value but different partnum
+                    if ((PartVal[i1] == PartVal[i2]) && (PartDev[i1] == PartDev[i2]))
+                    {
+                        if (strlen(PartNum[i1]) && strlen(PartNum[i2]))
+                        {
+                            if (PartNum[i1] == PartNum[i2])
+                                continue;
+                        }
+                        else
+                        {
+                            continue;
+                        }
+                    }
+                }
+            }
+
+            // Calculate the qty of parts needed to build one unit.
+            int uqty = n2 - n1;
+
+            if (PartQty[i1])
+                uqty = PartQty[i1];
+
+            // Build a list of all part reference designators to this part number
+            // for debugging purposes in case a part number is not specified or
+            // the part number lookup fails. We dump all the part refs in case
+            // of an error so we can figure out which items have bad partno's.
+
+            numeric string partnames;
+
+            for (;;)
+            {
+                partnames += PartName[i1];
+
+                // Skip do not place (DNP) parts
+                if (PartDNP[i1])
+                {
+                    if (uqty && (incflag == 0))
+                        -- uqty;
+                }
+
+                if (++n1 < n2)
+                {
+                    i1 = index[n1];
+                    partnames += "/";
+                }
+                else
+                    break;
+            }
+
+            if (!uqty)
+                continue;
+
+            // Look up the supplier part number from mfg part number, column
+            // zero should always be the manufacturer part number key
+
+            int errflag = 0;
+
+            string partno_mfg = PartNum[i1];
+            string partno_vendor;
+            string cust_ref;
+            string vendor_id;
+            string mfg_name;
+            numeric string quantity1;
+
+            if (!partno_mfg)
+            {
+                printf("*** ERROR - MISSING '%s' ATTRIBUTE: %s\n", strPartNumAttrName, PartName[i1]);
+            }
+            else
+            {
+                // Look up vendor part number in database from the mfg part number.
+                partno_vendor = BOMDatabaseLookup(partno_mfg, "Vendor Part Num");
+
+                if (partno_vendor == nullKey)
+                    errflag = 1;
+
+                // Lookup the customer reference number for this part
+                cust_ref  = BOMDatabaseLookup(partno_mfg, "XREF");
+
+                if (cust_ref == nullKey)
+                    cust_ref = partnames;
+
+                // Lookup the vendor ID based on the mfg part number - must be "ME"
+                vendor_id = BOMDatabaseLookup(partno_mfg, "VID");
+
+                // Lookup the manufacturer name based on the mfg part number
+                mfg_name  = BOMDatabaseLookup(partno_mfg, "Mfg Name");
+
+                // Lookup first bulk quantity value
+                quantity1 = BOMDatabaseLookup(partno_mfg, "Qty 1");
+                if (quantity1 == nullKey)
+                {
+                    sprintf(quantity1, "%d", uqty * BldQty1);
+                }
+            }
+
+            // Only output parts with Mouser vendor id "ME"
+
+            if ((vendor_id == "ME") || (vendor_id == nullKey))
+            {
+                printf("%s%s", quantity1, delimit);
+                printf("%s%s", partno_mfg, delimit);
+                printf("%s%s", mfg_name, delimit);
+                printf("%s%s", partno_vendor, delimit);
+                printf("%s%s", cust_ref, delimit);
+
+                if (errflag)
+                    printf("*** PART# '%s' NOT FOUND : %s", partno_mfg, partnames);
+
+                printf("\n");
+
+                records++;
+            }
+
+            numlines++;
+        }
+    };
+
+    if (fileerror())
+        dlgMessageBox("A file error occured!");
+
+    return records;
+}
+
+
+int ExportMouser()
+{
+    int optnum = 0;
+        
+    int result = dlgDialog("Export Mouser Parts Order")
+    {
+        dlgHBoxLayout
+        {
+            dlgGroup("Export BOM As")
+            {
+                dlgRadioButton("CSV Format (upload file)", optnum);
+                dlgRadioButton("Simple Text (cut/paste)", optnum);
+            }
+        }
+        
+        dlgHBoxLayout
+        {
+            dlgHBoxLayout
+            {
+                dlgStretch(1);
+                dlgPushButton("+OK") dlgAccept();
+                dlgPushButton("-Cancel") dlgReject();
+            }
+        }
+    };
+
+    if (!result)
+        return -1;
+        
+    if (optnum == 0)
+        result = ExportMouserCSV();
+    else        
+        result = ExportMouserTXT();
+        
+    return result;
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// Export non-empty part numbers only.
+//
+
+int ExportPartNums()
+{
+    int nOption;
+    int sortByPartNum = 1;
+        
+    int result = dlgDialog("Export Part Numbers")
+    {
+        dlgGroup("Export Options")
+        {
+            dlgGroup("File Format")
+            {
+                dlgRadioButton("All part number attributes assigned in schematic", nOption);
+                dlgRadioButton("Only part numbers not found in the parts database", nOption);
+            }
+            dlgCheckBox("Sort by PartNum only (ignore part value)", sortByPartNum);                        
+        }
+        
+        dlgHBoxLayout
+        {
+            dlgPushButton("OK") dlgAccept();
+            dlgPushButton("-Cancel") dlgReject();
+        }
+    };
+
+    if (!result)
+        return -1;
+        
+    string line;
+    string fname;
+    string extname = ".txt";
+
+    //ConfigFilePath
+    fname = filesetext(ConfigFilePath+DefaultFileName, "_PartNums"+extname);
+
+    fname = dlgFileSave("Export Part Numbers", fname, "TXT files (*" + extname + ");;All files (*)");
+
+    if (!fname)
+        return -1;
+
+    if (fileext(fname) != extname)
+        fname += extname;
+
+    fileerror();
+
+    int records = 0;
+
+    output(fname, "wt")
+    {
+        int i, i1, n1, n2;
+        int numlines = 0;
+        int index[];
+
+        // sort by part value
+        sort(nPartCount, index, PartVal, PartNum, PartDev, PartName);
+
+        for (n1=0, n2=0; ++n2 <= nPartCount;)
+        {
+            i1 = index[n1];
+
+            if (n2 < nPartCount)
+            {
+                int i2 = index[n2];
+                // [RES155] check for different partnum only
+                if (sortByPartNum)
+                {
+                    if ((strlen(PartNum[i1]) == 0) || (strlen(PartNum[i2]) == 0))
+                        continue;
+                    if (PartNum[i1] == PartNum[i2])
+                        continue;
+                }
+                else
+                {                
+                    // [RES144] check for same value but different partnum
+                    if ((PartVal[i1] == PartVal[i2]) && (PartDev[i1] == PartDev[i2]))
+                    {
+                        if (strlen(PartNum[i1]) && strlen(PartNum[i2]))
+                        {
+                            if (PartNum[i1] == PartNum[i2])
+                                continue;
+                        }
+                        else
+                        {
+                            continue;
+                        }
+                    }
+                }
+            }
+
+            // Calculate the qty of parts needed to build one unit.
+            int uqty = n2 - n1;
+
+            if (PartQty[i1])
+                uqty = PartQty[i1];
+
+            // Build a list of all part reference designators to this part number
+            // for debugging purposes in case a part number is not specified or
+            // the part number lookup fails. We dump all the part refs in case
+            // of an error so we can figure out which items have bad partno's.
+
+            numeric string partnames;
+
+            for (;;)
+            {
+                partnames += PartName[i1];
+
+                // Skip do not place (DNP) parts
+                if (PartDNP[i1])
+                {
+                    partnames += dnpSuffix;
+
+                    if (uqty)
+                        -- uqty;
+                }
+
+                ++n1;
+
+                if (n1 < n2)
+                {
+                    i1 = index[n1];
+                    partnames += "/";
+                }
+                else
+                    break;
+            }
+
+            // Look up the supplier part number from mfg part number, column
+            // zero should always be the manufacturer part number key
+
+            if (PartDNP[i1])
+                continue;
+                
+            string part_num = PartNum[i1];
+                
+            if (part_num)
+            {
+                if (part_num != nullKey)
+                {
+                    if (nOption >= 1)
+                    {
+                        // Export only part numbers not found in the database
+                        string partno_vendor;
+                        
+                        // Check it mfg part number exists in database
+                        partno_vendor = BOMDatabaseLookup(part_num, "Mfg Part Num");
+
+                        // If partnum not found, then write it to the file
+                        if (partno_vendor == nullKey)
+                        {
+                            printf("%s : %s\n", part_num, partnames);
+                            records++;                    
+                        }
+                    }
+                    else
+                    {
+                        // Export all non-null part numbers
+                        //printf("%s : %s\n", part_num, partnames);
+                        printf("%s\n", part_num);
+                        records++;
+                    }
+                }
+            }
+
+            numlines++;
+        }
+    };
+
+    if (fileerror())
+        dlgMessageBox("A file error occured!");
+
+    return records;
+}
+            
+//////////////////////////////////////////////////////////////////////////////
+// Main Export Dialog
+
+int ExportBOM(void)
+{
+    int format = 0;
+
+    if (!nPartCount)
+    {
+        dlgMessageBox("No parts found!");
+        return 0;
+    }
+
+    if (!Database[0])
+    {
+        dlgMessageBox("Please load a database file first!");
+        return 0;
+    }
+
+    int result = dlgDialog("Export BOM File")
+    {
+        dlgHBoxLayout
+        {
+            dlgGroup("Export File Type")
+            {
+                dlgRadioButton("&Generic CSV or Tabbed Text", format);
+                dlgRadioButton("&Digi-Key Order Import File (CSV)", format);
+                dlgRadioButton("&Mouser Electronics Order Import File (CSV)", format);
+                dlgRadioButton("&Allied Electronics Order Import File (CSV)", format);
+                dlgRadioButton("&Part Numbers Attributes Only (TXT)", format);
+            }
+            dlgVBoxLayout
+            {
+                dlgStretch(1);
+                dlgPushButton("+OK") dlgAccept();
+                dlgPushButton("-Cancel") dlgReject();
+            }
+        }
+    };
+
+    if (result)
+    {
+        int recs = -1;
+
+        switch(format)
+        {
+        case 0:
+            recs = ExportGeneric();
+            break;
+        case 1:
+            recs = ExportDigiKey();
+            break;
+        case 2:
+            recs = ExportMouser();
+            break;
+        case 3:
+            recs = ExportAllied();
+            break;
+        case 4:
+            recs = ExportPartNums();
+            break;
+        }
+
+        if (recs > 1)
+        {
+            string tmp;
+            sprintf(tmp, "%d ", recs);
+            dlgMessageBox(tmp + "record item(s) were exported!");
+        }
+        else if (recs == 1)
+            dlgMessageBox("One record item was exported!");
+        else if (recs == 0)
+            dlgMessageBox("No records were found for exporting!");
+    }
+
+    return result;
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// Save all the part number attribute data as a script
+        
+int WriteScriptData(string fileName)
+{
+    if (!fileName)
+    if (fileext(fileName) != ".scr")
+        fileName += ".scr";
+
+    fileerror();
+
+    int nsheet = -1;
+    string modulename = "";
+    string localpartname = "";
+
+    output(fileName, "wt")
+    {    
+        printf("#\n# generated by BOM-EX v%s\n#\n", strVersion);
+        printf("SET UNDO_LOG OFF;\n");
+        printf("CHANGE DISPLAY OFF;\n");
+
+        for (int i=0; i < nPartCount; i++)
+        {
+            // Is the part we're changing on the current sheet?
+            // If not, move the current sheet with this part.
+
+
+            if ( (modulename != PartModule[i]) || (nsheet != PartSheet[i]) )
+            {
+                if (PartModule[i] == "")
+                    printf("EDIT .s%d;\n", PartSheet[i]);
+                else
+                    printf("EDIT %s.m%d;\n", PartModule[i], PartSheet[i]);
+
+                nsheet = PartSheet[i];
+                modulename = PartModule[i];
+            }
+
+            // Do we have any part number changes on this sheet?
+            // If so, set the new part number attribute.
+            // ..but first choose the local name of the part in its (sheet or module) context
+
+            if (modulename == "")
+                localpartname = PartName[i];
+            else
+                localpartname = PartModulepartName[i];
+
+            if (ApplyAllAttrs || ((PartNum[i] != "") && (PartNum[i] != PartNumPrev[i])))
+            {
+                // Now add the updated part number attribute back.
+                printf("ATTRIBUTE '%s' '%s' '%s';\n",
+                    localpartname, strPartNumAttrName, PartNum[i]);
+            }
+
+            // If the user has assigned a new part value different from
+            // what was originally loaded, we need to apply the value
+            // change to the part also.
+            
+            if (PartVal[i] != PartValSave[i])
+                printf("VALUE %s '%s';\n", localpartname, PartVal[i]);
+                
+            // If the user has assigned a new package name different from
+            // what was originally loaded, then generate change package command.
+
+            if ((PartDevChange[i] != "") && (PartDevChange[i] != PartDev[i]))
+                printf("CHANGE PACKAGE %s '%s';\n", localpartname, PartDevChange[i]);
+        }
+
+        printf("EDIT .s1;\n");
+        printf("SET UNDO_LOG ON;\n");        
+    }
+
+    PartNumModified = 0;
+
+    return !fileerror();
+}
+
+
+void ApplyScriptData()
+{
+    string fname;
+
+    //if (dlgMessageBox("Exit and apply all updated part number attributes to the schematic?", "+&OK", "-Cancel") != 0)
+    //    return;
+    
+    schematic(SCH)
+    {
+        fname = filesetext(SCH.name, "_UpdatePartNumAttributes.scr");
+    }
+
+    if (!fname)
+        return;
+
+    if (!WriteScriptData(fname))
+        return;
+
+    string cmd;
+    sprintf(cmd, "SCRIPT '%s';\n", fname);
+    exit(cmd);
+}
+
+int SaveScriptData()
+{
+    if (!nPartCount)
+    {
+        dlgMessageBox("No part data exists!");
+        return 0;
+    }
+
+    string fileName = "";
+
+    schematic(SCH)
+    {
+        fileName = filesetext(SCH.name, "_UpdatePartNumAttributes.scr");
+    }
+
+    fileName = dlgFileSave("Save Script file", fileName, "Script files (*.scr);;All files (*)");
+
+    if (!fileName)
+        return 0;
+
+    if (fileext(fileName) != ".scr")
+        fileName += ".scr";
+
+    return WriteScriptData(fileName);
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// This function allows the user to import a TAB delimited text file
+// that contains part ID and manufacturer part number information.
+
+string txtImportHlp = "This function allows importing a tabbed text delimited file "
+    "that contains part ID and part number key information. This feature is "
+    "useful for assigning part number attributes from existing external BOM data "
+    "for BOM-EX usage. The import file data must be in the following format:\n\n"
+    "  Part Name\t\tPart Number\n"
+    "  R4\t\tMCR10EZHJ000\n"
+    "  R21\t\tERA-6YEB101V\n"
+    "  R12\t\tERA-6YEB391V\n"
+    "  \"R3, R20\"\t\tERJ-6ENF1001V\n"
+    "  R13\t\tERJ-6ENF1241V\n"
+    "  R1\t\tERJ-6ENF2211V\n"
+    "  \"R5, R7, R10, R25\"\tERJ-6ENF4751V\n\n"
+    "Note the first line containing \"Part Name\" and \"Part Number\" is the "
+    "header line. The names in these columns don't really matter but the "
+    "header and all other data records must have TAB delimiters for the "
+    "record field delimiters.\n\n"
+    "The \"Part Name\" fields may contain multiple part name designators, but "
+    "each part id must be delimited by a comma. If multiple part name designators "
+    "are contained on a line, it should have quotes around the entire part id "
+    "names string (default Excel format for tabbed text).";
+
+int ImportPartNums()
+{
+    int rtn;
+    
+    rtn = dlgDialog("Import Part Numbers")
+    {
+        dlgHBoxLayout dlgSpacing(650);
+        dlgHBoxLayout
+        {
+            dlgVBoxLayout dlgSpacing(300);
+            dlgTextView(txtImportHlp);
+        }
+        dlgHBoxLayout
+        {
+            dlgStretch(1);
+            dlgPushButton("+OK") dlgAccept();            
+            dlgPushButton("-Cancel") dlgReject();
+        }
+    };
+    
+    if (rtn <= 0)
+        return 0;
+
+    string fileName;
+    string data[];
+    int numlines;
+
+    schematic(SCH)
+    {
+        fileName = filesetext(SCH.name, ".txt");
+    }
+
+    fileName = dlgFileOpen("Import Part Name Numbers", fileName, "Import part number files (*.txt);;All files (*)");
+
+    if (!fileName)
+        return 0;
+
+    if ((numlines = fileread(data, fileName)) > 0)
+    {
+        for (int i=1; i < numlines; i++)
+        {
+            int n;
+            string cols[];
+
+            if ((n = strsplit(cols, data[i], '\t')) == 2)
+            {
+                string partids = TrimQuotes(cols[0]);
+                string partnum = TrimWhiteSpace(cols[1]);
+
+                string id[];
+                n = strsplit(id, partids, ',');
+
+                for (int j=0; j < n; j++)
+                {
+                    string partid = TrimWhiteSpace(id[j]);
+
+                    int ndx = PartSearch(partid);
+
+                    if (ndx >= 0)
+                        PartNum[ndx] = partnum;
+                }
+            }
+        }
+
+        PartNumModified = 1;
+
+        GenerateList();
+
+        dlgRedisplay();
+
+        return 1;
+    }
+
+    return 0;
+}
+
+//////////////////////////////////////////////////////////////////////////////
+//
+
+int OkToClose(void)
+{
+    if (PartNumModified)
+    {
+        int rtn = dlgMessageBox("Part numbers have been added or modified\n\nSave Script?", "+&Yes", "&No", "-Cancel");
+        switch (rtn)
+        {
+        case 0: return SaveScriptData();
+        case 1: break;
+        case 2: return 0;
+        }
+    }
+    return 1;
+}
+
+void DisplayHelp(void)
+{
+    dlgDialog("Bill Of Material - Help")
+    {
+        dlgHBoxLayout dlgSpacing(650);
+        dlgHBoxLayout
+        {
+            dlgVBoxLayout dlgSpacing(300);
+            dlgTextView(HelpTextEN);
+        }
+        dlgHBoxLayout
+        {
+            dlgStretch(1);
+            dlgPushButton("-Close") dlgReject();
+        }
+    };
+}
+
+// load the last config settings saved
+
+void LoadConfigSettings()
+{
+    string a[];
+    int n;
+
+    // Should be 4 lines of data in config file
+    if ((n = fileread(a, filedir(argv[0])+ConfigFileName)) == 4)
+    {
+        int i = 0;
+        ConfigFilePath = a[i++];
+        ListType       = strtol(a[i++]);
+        OutputFormat   = strtol(a[i++]);
+        ApplyAllAttrs  = strtol(a[i++]);
+    }
+}
+
+void SaveConfigSettings()
+{
+    // save the config settings 
+    output(filedir(argv[0])+ConfigFileName, "wt")
+    {
+        printf("%s\n", ConfigFilePath);
+        printf("%d\n", ListType);
+        printf("%d\n", OutputFormat);
+        printf("%d\n", ApplyAllAttrs);
+    }
+}
+
+int ToolsDialog()
+{
+    int result = dlgDialog("BOM Tools")
+    {
+        dlgHBoxLayout dlgSpacing(200);
+        dlgVBoxLayout
+        {
+            dlgGroup("BOM Tools")
+            {
+                dlgPushButton("Verify all Part Values") dlgAccept(1);   //ValueCheck();
+                dlgPushButton("Verify all Package Codes") dlgAccept(2); // PackageCheck();
+                dlgPushButton("List all Package Codes") dlgAccept(3);   //PackageList();
+                dlgPushButton("&Import Part Numbers") dlgAccept(4);    //ImportPartNums();
+            }
+        }
+        dlgVBoxLayout
+        {
+            dlgPushButton("-Close") dlgReject();
+        }
+    };
+
+    switch(result)
+    {
+        case 1:
+            ValueCheck();
+            break;
+        case 2:
+            PackageCheck();
+            break;
+        case 3:
+            PackageList();
+            break;
+        case 4:
+            ImportPartNums();
+            break;
+    }            
+        
+    return result;
+}
+    
+// MAIN SCRIPT EXECUTION ENTRY POINT //////////////////////////////
+
+void OnListTypeChange()
+{
+    if (ListType == ltParts) {
+        GeneratePartList();
+        SortCol = 1;
+    } else {
+        GenerateValueList();
+        SortCol = 5;
+    }
+    Selected = 0;
+}
+
+void OnClickListView()
+{
+    if (ListType == 0)
+        EditPart();
+    else
+        EditPartSet();
+}
+
+void OnVariantComboChange()
+{
+    CurrentVariant = Variants[VDsel];
+    setvariant(CurrentVariant);
+    CollectPartData(CurrentVariant);
+    GenerateList();
+}
+
+int AppDialog()
+{
+    int rtn = dlgDialog("BOM-EX v" + strVersion)
+    {
+        // Set the default view width
+        dlgHBoxLayout dlgSpacing(WindowMinWidth);
+            
+        dlgHBoxLayout
+        {
+            //dlgLabel("Database:");
+            //dlgLabel(DatabaseFilename, 1);
+            //dlgStretch(1);
+            
+            dlgLabel("Assembly &Variant ");
+            dlgComboBox(Variants, VDsel) OnVariantComboChange();
+            dlgLabel(strBOMCount, 1);
+
+            dlgStretch(1);
+            dlgPushButton("&Load DB") if (OkToClose()) LoadDatabase("");
+            dlgPushButton("H&elp") DisplayHelp();
+        }
+
+        dlgHBoxLayout
+        {
+            // Set the default list view height
+            dlgVBoxLayout dlgSpacing(500);
+            dlgListView("", Lines, Selected, SortCol) OnClickListView();
+        }
+            
+        dlgHBoxLayout
+        {
+            dlgHBoxLayout 
+            {
+               
+                //dlgLabel("List by:");
+                //string comboView[] = { "Parts", "Values" };
+                //dlgComboBox(comboView, ListType) OnListTypeChange();
+
+                //dlgLabel("Format:");
+                //string comboFmt[] = { "Text", "Tabbed Text", "CSV", "HTML" };
+                //dlgComboBox(comboFmt, OutputFormat);
+                
+                dlgGroup("View By")
+                {
+                    
+                    dlgHBoxLayout 
+                    {
+                        dlgRadioButton("&Parts", ListType) OnListTypeChange();
+                        dlgRadioButton("&Values", ListType) OnListTypeChange();
+                    }
+                }
+
+                dlgGroup("Save Format")
+                {
+                    dlgHBoxLayout 
+                    {
+                        dlgRadioButton("&Text", OutputFormat);
+                        dlgRadioButton("&Text Tabbed", OutputFormat);
+                        dlgRadioButton("&Text CSV", OutputFormat);
+                        dlgRadioButton("&HTML", OutputFormat);
+                    }
+                }                
+
+                dlgGroup("Options")
+                {
+                    dlgHBoxLayout 
+                    {
+                        dlgCheckBox("Apply part number attributes globally", ApplyAllAttrs);
+                        dlgCheckBox("Show Excluded Parts", ShowExcludedParts) OnVariantComboChange();                        
+                    }
+                }                
+            }
+
+            dlgStretch(10);
+            
+            dlgHBoxLayout 
+            {
+                dlgVBoxLayout
+                {
+                    dlgPushButton("Tools") ToolsDialog();
+                    dlgPushButton("&Previe&w") ViewList();                
+                }
+                dlgVBoxLayout
+                {
+                }
+                dlgVBoxLayout
+                {
+                    dlgPushButton("A&ssign Part#") EditPartSet();
+                    dlgPushButton("&Save BOM") SaveBOM();
+                }
+                dlgVBoxLayout
+                {
+                    dlgPushButton("&Clear Part#") ClearPartNumberSet();
+                    dlgPushButton("E&xport BOM") ExportBOM();
+                }
+                dlgVBoxLayout
+                {
+                    dlgPushButton("C&lear All Part#s") ClearAllPartNumbers();
+                    dlgPushButton("Sa&ve Script") SaveScriptData();
+                }
+                dlgVBoxLayout
+                {
+                    dlgPushButton("-Close") if (OkToClose()) dlgAccept();
+                    dlgPushButton("&Apply All") 
+                    {
+                        SaveConfigSettings();
+                        ApplyScriptData();
+                    }
+                }
+             }
+        }
+    };
+    
+    return rtn;
+}
+
+if (!schematic)
+{
+    dlgMessageBox(usage + "<hr><b>ERROR: No schematic!</b><p>\nThis program can only work in the schematic editor.");
+    exit(1);
+}
+else
+{
+    // load the last file open directory path saved
+    LoadConfigSettings();
+
+    DatabaseFilename = ConfigFilePath;
+
+    schematic(SCH)
+    {
+        DefaultFileName = filename(SCH.name);
+
+        // Check global attributes for DATABASE name to auto-load.
+        // If the name begins with a period, then treat the path
+        // as relative to the base schematic project directory.
+        // Otherwise, assume the global name specfies a full path.
+
+        SCH.attributes(A)
+        {
+            if (strupr(A.name) == "DATABASE")
+            {
+                string fname = A.value;
+                if (fname[0] == '.')
+                {
+                    string tmp = fname;
+                    for (int i=0; i < strlen(tmp)-2; i++)
+                        fname[i] = tmp[i+2];
+                    fname[i] = 0;
+                    fname = filedir(SCH.name) + fname;
+                }
+                LoadDatabase(fname);
+                break;
+            }
+        }
+            
+        // Get the assembly variant names and set active variant.
+        
+        CurrentVariant = variant();
+        
+        SCH.variantdefs(VD) {
+            if (CurrentVariant == VD.name)
+                VDsel = cntVD;
+            sprintf(Variants[cntVD], "%s", VD.name);
+            cntVD++;
+        }
+    }
+
+    if (ListType == ltParts)
+        SortCol = 1;
+    else if (ListType == ltValues)
+        SortCol = 5;
+
+    setvariant(CurrentVariant);
+    CollectPartData(CurrentVariant);
+    GenerateList();
+
+    int rtn = AppDialog();
+    
+    if (rtn)
+    {
+        SaveConfigSettings();
+    }
+}        
+
+// End-Of-File
+

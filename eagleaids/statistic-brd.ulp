@@ -1,0 +1,2853 @@
+#usage "<qt><b>Statistic Table of Elements in the Layout</b><p>\n"
+       "To change the units in the table, please use the variable uval,\n"
+       "which can be found in the ulp file.<p>\n"
+       "THIS PROGRAM IS PROVIDED AS IS AND WITHOUT WARRANTY OF ANY KIND, "
+       "EXPRESSED OR IMPLIED.<p>\n"
+       "<author>Author: alf@cadsoft.de</author></qt>"
+
+#require 6.0300
+
+// 2005-01-12 - Check if layer Top or Bottom used as Power-Plane *** alf@cadsoft.de
+// 2005-07-05 - Calculate used area of packages. Use pads, smds and elements in
+//              Layer 21/51 to calculate the used area of package.
+//              Rotation of packages are not consider
+// 2005-07-19 - Polygon-Rank
+// 2005-11-17 - List all defined Layers
+// 2005-12-01 - List same Values && Packages && Layer
+// 2005-12-08 - List Signals without connection (PAD/SMD) as False-Signals
+// 2006-04-28 - Mask Layer
+// 2006-09-26 - Circle in Copper-Layer and Text in Place-Layer
+// 2006-10-05 - List first Wire coordinate of Flase Signals if exist
+// 2007-12-04 - Corrected Class handling to select net-list if classes empty
+// 2007-12-19 - Locked & Unlocked Packages
+// 2009-02-11 - save also false signals, and rudimentarily signal name in report
+//              # rudimentary signal names can produced by older eagle version
+// 2009-07-15 - Check Polygon in Supply-Layer $name
+// 2009-10-15 - separate drill statistic by via stack
+// 2009-12-02 - separate packages with and without contacts
+// 2010-03-10 - Roundes of SMDs
+// 2010-06-09 - Count no Elements with PREFIX TP = TestPoint
+// 2010-08-19 - Count RECT in any layer (not copper / can placed by RUN import-bmp.ulp)
+// 2010-10-13 - check ARC < 90 for min/max Dimension
+// 2011-05-03 - mark Pad in via stack 1-16 as PAD
+// 2012-01-11 - correct count circles, new sumcntRECT
+// 2012-05-24 - new global via counter
+// 2012-11-19 - corrected count different via drills, compare up to 2 decimals
+// 2014-11-27 - support of 16 netclasses
+
+string Version = "Version 1.3.9";   // 2014-11-27
+
+int    uval = 1;
+string unit[] = { "Micron", "mm", "Mil", "Inch" };
+int    unitPrec[] = { 0, 1, 1, 3 }, RoundFactor = pow(10, unitPrec[uval]);
+
+string minvalfile = filesetext(argv[0], "-checkmin.val");
+real   checkMinWire = 0.3;
+real   checkMinArc = checkMinWire;
+real   checkMinCirc = checkMinWire;
+real   checkMinPoly = checkMinWire;
+real   checkMinRestringP = checkMinWire;
+real   checkMinRestringV = checkMinWire;
+real   checkMinClearance = 0.3;
+real   checkMinIsol = checkMinClearance;
+real   checkMinPadDrill = 0.6;
+real   checkMinViaDrill = checkMinPadDrill;
+real   checkMinHoleDrill = checkMinPadDrill;
+string checkSupplyLayerPolygon = "";     // 2009-07-15
+string SupplyLayerName[];
+int    SupplyLayers[];
+int    SupplyLayersUsedPolygons[];
+string showminValWidth;
+string showminValOther;
+
+string LabelcntRECT;
+string LabelcntRectANYlayer;
+string LabelcntCIRCLE;
+string LabelcntTextSize;
+string LabelcntTextWidth;
+string LabelcntPlaceTextSize;
+string LabelcntPlaceTextWidth;
+
+int    maxX = INT_MIN;
+int    minX = INT_MAX;
+int    maxY = INT_MIN;
+int    minY = INT_MAX;
+
+string wireWidthInternal = " * Wire width are saved in 0.2 micron resolution.\n";
+
+int    WireWidth[];
+int    cWireWidth[];
+int    cntWire = 0;
+
+int    ArcWidth[];
+int    cArcWidth[];
+int    cntArc = 0;
+
+// ******************************************************************
+// *** WIRE WIDTH wird nur geradzahlig gespeichert, wegen Teilung *** az
+// ******************************************************************
+string PolygonLayer[] = { "" , ""};
+int    cPolygonL = 0;
+int    PolygonWidth[];
+int    cPolygonWidth[];
+int    cntPolyW = 0;
+
+string PolygonSignalName[];
+int    PolygonIsolate[];
+int    PolygonRank[];
+int    cPolygonIsolate[];
+int    cntPolyIso = 0;
+int    PolyWidthError = 0;
+string PolygonError = "";
+
+int    cntLayer = 0;
+string usedLayer;
+int    cntalllay;
+string allLayers[];
+string layerError;
+string displayLayerError;
+real   outlines = 0;
+string brdoutline;
+string brdmaximum = "max. Board length ?\n(layer 20 empty)";
+
+string NetClassName[];
+int    NetClassWidth[];
+int    NetClassClear[];
+int    NetClassDrill[];
+int    NetClassNr[];
+int    selNetClassNr[];
+int    cNetClass[];
+
+string SignalName[];
+int    SignalClass[];
+string SignalClassList[];
+int    SignalClassSelect = 0;
+int    SignalCnt = 0;
+int    SignalUnrouted = 0;
+string Unrouted = "";
+
+string falseSignalList[];  // only signal if connected to pad or smd is a true signal 2005-12-08 alf@cadsoft.de
+string FalsWxy[];          // 2006-10-05 coordiante of 1. wire segment if false signal
+int    falseSignalCnt = 0;
+int    cntfalseSignalVias[];
+int    cntfalseSignalWires[];      // 2009-02-11
+string deleteRudimentalSignalName = "";  // 2009-02-12
+
+int    cnt_pad_on_signal = 0;
+
+int    SMDx[], SMDy[];
+int    cSMD[];
+int    rSMD[];                  // Roundness  2010-03-10
+
+int    cntSMDt = 0;
+int    cntSMDb = 0;
+int    cntSMD = 0;
+
+int    CirclWidth[];
+int    cCirclWidth[];
+int    cntCircl = 0;
+int    sumcntCircl = 0;
+int    CirclDiam[];
+int    cCirclDiam[];
+int    cntCirclDiam = 0;
+
+int    RECTx[];
+int    RECTy[];
+int    cRECT[];
+int    cntRECT = 0;
+int    sumcntRECT = 0;
+int    cntRectANYlayer[];
+string statisticSumRectANYlayer;
+
+//int    CIRCLEx[];
+//int    CIRCLEy[];
+//int    cCIRCLE[];
+//int    cntCIRCLE = 0;
+
+
+int    TextWidth[];
+int    cTextWidth[];
+int    cntTextWidth = 0;
+int    TextSize[];
+int    cTextSize[];
+int    cntTextSize = 0;
+
+int    PlaceTextWidth[];
+int    cPlaceTextWidth[];
+int    cntPlaceTextWidth = 0;
+int    PlaceTextSize[];
+int    cPlaceTextSize[];
+int    cntPlaceTextSize = 0;
+
+
+int    PadDrill[];
+int    cPadDrill[];
+int    cntPDril = 0;
+
+int    PadDiameterTOP[];
+int    cPadDiameterTOP[];
+int    cntPDiamTOP = 0;
+int    PadDiameterBOT[];
+int    cPadDiameterBOT[];
+int    cntPDiamBOT = 0;
+int    iPadDiameter[];  // inner Layer
+int    ciPadDiameter[];
+int    cntiPDiam = 0;
+
+int    PadRestringTOP[];
+int    cPadRestringTOP[];
+int    cntPringTOP;
+int    PadRestringBOT[];
+int    cPadRestringBOT[];
+int    cntPringBOT;
+int    PadRestringI[];
+int    cPadRestringI[];
+int    cntPringI = 0;
+
+int    ViaDrill[];
+int    cViaDrill[];
+int    cntVDril = 0;
+int    cntVias = 0;     // 2012-05-24 global via counter
+
+int    ViaDiameter[];
+int    cViaDiameter[];
+int    cntVDiam = 0;
+
+int    ViaDiameterI[];
+int    cViaDiameterI[];
+int    cntVDiamI = 0;
+
+int    ViaRestringO[],  ViaRestringI[];
+int    cViaRestringO[], cViaRestringI[];
+int    cntVringO = 0,   cntVringI = 0;
+
+int    ViaStackCnt[];
+string ViaStack[];
+int    cntStack = 0;
+string StackDrills[];  // 2009-10-15
+string showStackDrills[];
+
+int    Hole[];
+int    cHole[];
+int    cntHole = 0;
+
+string drillRack[];
+real   Drilling[];
+int    imax = 0;
+
+string Lbr[];
+int    cLbr[];
+int    cntLbr = 0;
+
+string PacName[];
+int    cPacName[];
+int    cntPacName = 0;
+// --- same Value and Package and Layer --- 2005-12-01 alf@cadsoft.de
+int    cntEVPL = 0;
+string EVALpac[];
+string EvalPAC[];
+int    cEVPL[], cEVPL1[], cEVPL16[];
+
+
+int    emptyValue = 0;
+string empty = "~/-empty-/~";
+
+int    cntTPelement = 0;  // 2010-06-09
+string statisticTestPoint;
+
+int    cntElement = 0;
+string Ename[];
+int    ELocked[];
+int    cntLocked = 0;
+real   eUsedArea[];  // calculate over xPlace/xDocu/PAD/SMD  12.05.2005 alf@cadsoft.de
+int    eUsedLayer[];
+real   summary_area = 0;
+
+string EContact[];  // 2009-12-02
+int    cntCont = 0;
+string EnoContact[];
+int    cntNoCont = 0;
+
+
+int    art_selected = 0;
+int    LBRselected;
+int    PACselected;
+int    pac_drill[], cntpac_drill[], cnt_d;
+int    pac_hole[], cntpac_hole[], cnt_h;
+int    VALselected;
+string Element_info = " \n \n \n";
+string linfo = "<nobr><font color=darkgreen>&nbsp;Double click in listings<br> for detailed info</font></nobr>";
+
+string sum;
+   int sumSignals = 0;
+   int sumWires = 0;
+   int minWires = INT_MAX;
+   int sumARCw = 0;
+   int minARCw = INT_MAX;
+   int sumCIRCw = 0;
+   int minCIRCw = INT_MAX;
+   int sumCIRCdiam = 0;
+   int minCIRCdiam = INT_MAX;
+   int sumRECT = 0;
+   int sumAnyRECT = 0;
+   int minRECTx = INT_MAX;
+   int minRECTy = INT_MAX;
+   int minClearance = INT_MAX;
+   int sumPOLYw = 0;
+   int minPOLYw = INT_MAX;
+   int sumISOL = 0;
+   int minISOL = INT_MAX;
+   int sumSMD = 0;
+   int minSMDx = INT_MAX;
+   int minSMDy = INT_MAX;
+   int sumPADdril = 0;
+   int minPADdril = INT_MAX;
+   int sumPADdia = 0;
+   int minPADdia = INT_MAX;
+   int sumPADdiaI = 0;
+   int minPADdiaI = INT_MAX;
+   int sumPADrest = 0;
+   int minPADrest = INT_MAX;
+   int sumPADrestI = 0;
+   int minPADrestI = INT_MAX;
+   int sumVIAdril = 0;
+   int minVIAdril = INT_MAX;
+   int sumVIAdiam = 0;
+   int minVIAdiam = INT_MAX;
+   int sumVIAdiamI = 0;
+   int minVIAdiamI = INT_MAX;
+   int sumVIArest = 0;
+   int minVIArest = INT_MAX;
+   int sumVIArestI = 0;
+   int minVIArestI = INT_MAX;
+   int sumHOLE = 0;
+   int minHOLE = INT_MAX;
+   int sumTEXTw = 0;
+   int minTEXTw = INT_MAX;
+   int sumPlaceTEXTw = 0;
+   int minPlaceTEXTw = INT_MAX;
+
+
+   int padlSTOP[];  // Mask in Package 2006-04-28
+   int smdlSTOP[];  // Mask in Package
+   int smdlCREAM[]; // Mask in Package
+   int lSTOPpac[];     // Mask in Package
+   int lSTOPbrd[];     // Mask in Board
+   int lCREAMpac[];    // Mask in Package
+   int lCREAMbrd[];    // Mask in Board
+   int msort = 0;
+
+int indexWire[],
+    indexPolygonWidth[],
+    indexPolygonIsolate[],
+    indexSMD[],
+    indexPadDrill[],
+    indexPadDia[],
+    indexiPadDia[],
+    indexPadRestring[],
+    indexPadRestringI[],
+    indexViaDrill[],
+    indexViaRestringO[],
+    indexViaRestringI[],
+    indexViaDiameter[],
+    indexViaDiameterI[],
+    indexHole[],
+    indexArcW[],
+    indexCirclW[],
+    indexTextWidth[],
+    indexPlaceTextWidth[];
+
+numeric string statisticWirew[];
+numeric string statisticPolyw[];
+numeric string statisticPoliso[];
+numeric string statisticCLASS[];
+numeric string statisticFalseSignals[];
+numeric string statisticSMD[];
+numeric string statisticPADdril[];
+numeric string statisticPADdiaTOP[];
+numeric string statisticPADdiaBOT[];
+numeric string statisticPADdiaI[];
+numeric string statisticPADrestTOP[];
+numeric string statisticPADrestBOT[];
+numeric string statisticPADrestI[];
+numeric string statisticVIAdril[];
+numeric string statisticVIAdia[];
+numeric string statisticVIAdiaI[];
+numeric string statisticVIArest[];
+numeric string statisticVIArestI[];
+numeric string statisticVIAstack[];
+numeric string statisticHOLE[];
+numeric string statisticARCw[];
+numeric string statisticCIRw[];
+numeric string statisticCIRdiam[];
+numeric string statisticRECT[];
+numeric string statisticRectANYlayer[];
+numeric string statisticTEXTw[];
+numeric string statisticTEXTsize[];
+numeric string statisticPlaceTEXTw[];
+numeric string statisticPlaceTEXTsize[];
+numeric string statisticLBR[];
+numeric string statisticPAC[];
+//numeric string statisticVALUE[]; 2005.12.02 gecancelt
+numeric string statisticValPacLay[];
+
+string  statisticLocked;
+string statisticSTOP_CREAM[];
+string Text;
+
+string ulp_path;
+char bkslash = '/';
+int pos = strrchr(argv[0], bkslash);
+if (pos >= 0) ulp_path = strsub(argv[0], 0, pos + 1);
+
+string attention = "<img src=statistic_attention_min_value.bmp>";
+
+string brdfile;
+
+
+// Functions
+
+real u2u(int v) {
+  switch (uval) {
+    case GRID_UNIT_MIC  : return u2mic(v);
+      break;
+
+    case GRID_UNIT_MM	: return u2mm(v);
+      break;
+
+    case GRID_UNIT_MIL  : return u2mil(v);
+      break;
+
+    case GRID_UNIT_INCH : return u2inch(v);
+      break;
+  }
+}
+
+
+string value(int v, string is) {
+  if (v == INT_MAX) return "<i>not used</i> " + is;
+  string sv;
+  switch (uval) {
+    case GRID_UNIT_INCH : sprintf(sv, "%.6f %s", u2inch(v), is);
+                          break;
+
+    case GRID_UNIT_MIL  : sprintf(sv, "%.3f %s", u2mil(v), is);
+                          break;
+
+    case GRID_UNIT_MM   : sprintf(sv, "%.4f %s", u2mm(v), is);
+                          break;
+
+    case GRID_UNIT_MIC  : sprintf(sv, "%.1f %s", u2mic(v), is);
+                          break;
+  }
+  return sv;
+}
+
+
+string min_value(int v, real minv) {
+  string sv = "<p>";
+  switch (uval) {
+    case GRID_UNIT_INCH : if(u2inch(v) < minv) {
+                          sprintf(sv, "%s &lt; %.4f<p>", attention, minv );
+                          }
+                          break;
+
+    case GRID_UNIT_MIL  : if(u2mil(v) < minv) {
+                          sprintf(sv, "%s &lt; %.4f<p>", attention, minv );
+                          }
+                          break;
+
+    case GRID_UNIT_MM   : if(u2mm(v) < minv) {
+                          sprintf(sv, "%s &lt; %.4f<p>", attention, minv );
+                          }
+                          break;
+
+    case GRID_UNIT_MIC  : if(u2mic(v) < minv) {
+                          sprintf(sv, "%s &lt; %.4f<p>", attention, minv );
+                          }
+                          break;
+  }
+  return sv;
+}
+
+
+string check_min_ValueWidth(void) {
+  string sh;
+  sprintf(sh, "%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s",
+         value(minWires, " - Wire width "),
+         min_value(minWires, checkMinWire),
+         value(minPOLYw, " - Polygon wire width"),
+         min_value(minPOLYw, checkMinPoly),
+         value(minARCw, " - Arc width "),
+         min_value(minARCw, checkMinArc),
+         value(minCIRCw, " - Circle width "),
+         min_value(minCIRCw, checkMinCirc),
+         value(minPADrest, " - Pad Restring "),
+         min_value(minPADrest, checkMinRestringP),
+         value(minVIArest, " - Via Restring "),
+         min_value(minVIArest, checkMinRestringV),
+         value(minClearance, " - Clearance "),
+         min_value(minClearance, checkMinClearance),
+         value(minISOL, " - Isolate Polygon "),
+         min_value(minISOL, checkMinIsol)
+         );
+  return sh;
+}
+
+string check_min_ValueOther(void) {
+  string sh;
+  sprintf(sh, "%s%s%s%s%s%s%s%s%s%s%s%s%s",
+         value(minTEXTw, " - Text width ") + "<p>",
+         value(minSMDx, " - SMD X ") + "<p>",
+         value(minSMDy, " - SMD Y ") + "<p>",
+         value(minPADdril, " - Pad drill "),
+         min_value(minPADdril, checkMinPadDrill),
+         value(minPADrestI, " - Pad Restring Inner.<p>"),
+         value(minVIAdril, " - Via drill "),
+         min_value(minVIAdril, checkMinViaDrill),
+         value(minVIArestI, " - Via Restring Inner.<p>"),
+         value(minHOLE, " - Hole drill "),
+         min_value(minHOLE, checkMinHoleDrill),
+         value(minRECTx, " - Rectangle X ") + "<p>",
+         value(minRECTy, " - Rectangle Y ")
+         );
+  return sh;
+}
+
+void AddDrilling(int Size) {
+  real x;
+  switch (uval) {
+    case GRID_UNIT_MIC  :   x = round(u2mic(Size) * RoundFactor) / RoundFactor;
+                         break;
+    case GRID_UNIT_MM   :   x = round(u2mm(Size) * RoundFactor) / RoundFactor;
+                         break;
+    case GRID_UNIT_MIL  :   x = round(u2mil(Size) * RoundFactor) / RoundFactor;
+                         break;
+    case GRID_UNIT_INCH : x = round(u2inch(Size) * RoundFactor) / RoundFactor;
+                         break;
+  }
+
+  for (int i = imax; --i >= 0; )
+      if (Drilling[i] == x)
+         return;
+  Drilling[imax++] = x;
+  return;
+}
+
+void loadminval(void) {
+  string line[];
+  int lines = fileread(line, minvalfile);
+  checkMinWire      = strtod(line[0]);
+  checkMinArc       = strtod(line[1]);
+  checkMinCirc      = strtod(line[2]);
+  checkMinPoly      = strtod(line[3]);
+  checkMinRestringP = strtod(line[4]);
+  checkMinRestringV = strtod(line[5]);
+  checkMinClearance = strtod(line[6]);
+  checkMinIsol      = strtod(line[7]);
+  checkMinPadDrill  = strtod(line[8]);
+  checkMinViaDrill  = strtod(line[9]);
+  checkMinHoleDrill = strtod(line[10]);
+  return;
+}
+
+
+void saveminval(void) {
+  output( minvalfile, "wt") {
+    printf("%.4f\n%.4f\n%.4f\n%.4f\n%.4f\n%.4f\n%.4f\n%.4f\n%.4f\n%.4f\n%.4f",
+         checkMinWire,
+         checkMinArc,
+         checkMinCirc,
+         checkMinPoly,
+         checkMinRestringP,
+         checkMinRestringV,
+         checkMinClearance,
+         checkMinIsol,
+         checkMinPadDrill,
+         checkMinViaDrill,
+         checkMinHoleDrill );
+  }
+  return;
+}
+
+void GetCheckValues(void) {
+  dlgDialog("Checked min values") {
+    dlgGridLayout {
+         dlgCell( 0, 0) dlgRealEdit( checkMinWire, 0, 10);
+         dlgCell( 0, 1) dlgLabel("Check minimum Wire width");
+         dlgCell( 1, 0) dlgRealEdit( checkMinArc, 0, 10);
+         dlgCell( 1, 1) dlgLabel("Check minimum ARC width");
+         dlgCell( 2, 0) dlgRealEdit( checkMinCirc, 0, 10);
+         dlgCell( 2, 1) dlgLabel("Check minimum Circle width");
+         dlgCell( 3, 0) dlgRealEdit( checkMinPoly, 0, 10);
+         dlgCell( 3, 1) dlgLabel("Check minimum Polygon width");
+         dlgCell( 4, 0) dlgRealEdit( checkMinRestringP, 0, 10);
+         dlgCell( 4, 1) dlgLabel("Check minimum Pad Restring width");
+         dlgCell( 5, 0) dlgRealEdit( checkMinRestringV, 0, 10);
+         dlgCell( 5, 1) dlgLabel("Check minimum Via Restring width");
+         dlgCell( 6, 0) dlgRealEdit( checkMinClearance, 0, 10);
+         dlgCell( 6, 1) dlgLabel("Check minimum Clearance");
+         dlgCell( 7, 0) dlgRealEdit( checkMinIsol, 0, 10);
+         dlgCell( 7, 1) dlgLabel("Check minimum Polygon Isolate");
+         dlgCell( 8, 0) dlgRealEdit( checkMinPadDrill, 0, 10);
+         dlgCell( 8, 1) dlgLabel("Check minimum Pad drill");
+         dlgCell( 9, 0) dlgRealEdit( checkMinViaDrill, 0, 10);
+         dlgCell( 9, 1) dlgLabel("Check minimum Via drill");
+         dlgCell(10, 0) dlgRealEdit( checkMinHoleDrill, 0, 10);
+         dlgCell(10, 1) dlgLabel("Check minimum Hole drill");
+    }
+    dlgLabel("All Units = " + unit[uval]);
+
+    dlgHBoxLayout {
+      dlgPushButton("+OK") {
+        dlgAccept();
+        showminValWidth = check_min_ValueWidth();
+        showminValOther = check_min_ValueOther();
+      }
+      dlgPushButton("&Save") saveminval();
+      dlgPushButton("&Load") loadminval();
+      dlgPushButton("-Cancel") dlgReject();
+      dlgStretch(1);
+    }
+  };
+  return;
+}
+
+string makestrg(string s) {
+  string rs;
+  return rs;
+}
+
+string saveReport(void) {
+  int t = time();
+  int n;
+  string report = "Data Exported from: ";
+  report +=  brdfile + "\n";
+  report += "with: " + argv[0] + " " + Version + "\n";
+  report += "at: " + t2string(t) + "\n";
+  report += EAGLE_SIGNATURE + "\n\n";
+  report += "all Values in " + unit[uval] + "\n";
+  report += brdmaximum + "\n";
+  report += brdoutline + "\n\n";
+  report += usedLayer + "_________________________\n";
+  if (layerError) report += layerError;
+  report += "\n";
+  report += sum + "\n";
+  report += "\n============================\n";
+  n=0;
+  if (Unrouted) report += Unrouted + " Unroutet airwires ***\n";
+  report += "\n============================\n";
+  n=0;   //2010-06-09
+  report += statisticLocked+"\n";
+  report += statisticTestPoint+"\n";
+  report += "\n----------------------------\nLAYER\n";
+  n=0;
+  sort(cntalllay, allLayers);
+  report += "Nb.\tName\tUsed\n";
+  for (n = 0; n < cntalllay; n++) {
+    report+= allLayers[n] + "\n";
+  }
+  report += "\n----------------------------\nCLASS\n";
+  n=0;
+  while (statisticCLASS[n]) {
+     report += statisticCLASS[n] + "\n";
+     n++;
+  }
+  report += "\n----------------------------\nWIDTH\n";
+  n=0;
+  while (statisticWirew[n]) {
+    report += statisticWirew[n] + "\n";
+    n++;
+  }
+  report += "\n";   n=0;
+  while (statisticARCw[n]) {
+    report += statisticARCw[n] + "\n";
+    n++;
+  }
+  report += wireWidthInternal;
+
+  report += "\n";   n=0;
+  while (statisticPolyw[n]) {
+    report += statisticPolyw[n] + "\n";
+    n++;
+  }
+  report += "\n";   n=0;
+  while (statisticPoliso[n]) {
+    report += statisticPoliso[n] + "\n";
+    n++;
+  }
+  report += "\nPolygon\n";   n=0;
+  report += "Type\tName\tLayer\tRank\tWidth\n";
+  while (PolygonLayer[n]) {
+    report += PolygonLayer[n] + "\n";
+    n++;
+  }
+  if (PolyWidthError) report += PolygonError + "\n";
+
+  report += wireWidthInternal;
+  report += "\n----------------------------\n";
+  n=0;
+  while (statisticCIRw[n]) {
+    report += statisticCIRw[n] + "\n";
+    n++;
+  }
+  report += "\n";   n=0;
+  while (statisticCIRdiam[n]) {
+    report += statisticCIRdiam[n] + "\n";
+    n++;
+  }
+  report += "\n----------------------------\n";
+  n=0;
+  while (statisticTEXTw[n]) {
+    report += statisticTEXTw[n] + "\n";
+    n++;
+  }
+  report += "\n";   n=0;
+  while (statisticTEXTsize[n]) {
+    report += statisticTEXTsize[n] + "\n";
+    n++;
+  }
+  report += "\n----------------------------\n";
+  n=0;
+  while (statisticSMD[n]) {
+    report += statisticSMD[n] + "\n";      n++;
+  }
+  report += "\n";   n=0;
+  while (statisticPADdiaTOP[n]) {
+    report += statisticPADdiaTOP[n] + "\n";
+    n++;
+  }
+  report += "\n";   n=0;
+  while (statisticPADdiaBOT[n]) {
+    report += statisticPADdiaBOT[n] + "\n";
+    n++;
+  }
+  report += "\n";   n=0;
+  while (statisticPADrestTOP[n]) {
+    report += statisticPADrestTOP[n] + "\n";
+    n++;
+  }
+  report += "\n";   n=0;
+  while (statisticPADrestBOT[n]) {
+    report += statisticPADrestBOT[n] + "\n";
+    n++;
+  }
+  report += "\n";   n=0;
+  while (statisticPADdiaI[n]) {
+    report += statisticPADdiaI[n] + "\n";
+    n++;
+  }
+  report += "\n";   n=0;
+  while (statisticPADrestI[n]) {
+    report += statisticPADrestI[n] + "\n";
+    n++;
+  }
+  report += "\n";   n=0;
+  while (statisticVIAdia[n]) {
+    report += statisticVIAdia[n] + "\n";
+    n++;
+  }
+  report += "\n";   n=0;
+  while (statisticVIArest[n]) {
+    report += statisticVIArest[n] + "\n";
+    n++;
+  }
+  report += "\n";   n=0;
+  while (statisticVIAdiaI[n]) {
+    report += statisticVIAdiaI[n] + "\n";
+    n++;
+  }
+  report += "\n";   n=0;
+  while (statisticVIArestI[n]) {
+    report += statisticVIArestI[n] + "\n";
+    n++;
+  }
+  report += "\n";   n=0;
+  while (statisticVIAdril[n]) {
+    report += statisticVIAdril[n] + "\n";
+    n++;
+  }
+  report += "\n";   n=0;
+  while (statisticVIAstack[n]) {
+    report += statisticVIAstack[n] + "\n";
+    n++;
+  }
+  report += "\n";   n=0;
+  while (statisticPADdril[n]) {
+    report += statisticPADdril[n] + "\n";
+    n++;
+  }
+  report += "\n----------------------------\n";
+  n=0;
+  while (statisticHOLE[n]) {
+    report += statisticHOLE[n] + "\n";      n++;
+  }
+  report += "\n";   n=0;
+  while (drillRack[n]) {
+    report += drillRack[n] + "\n";      n++;
+  }
+  report += "\n----------------------------\n";
+  n=0;
+  while (statisticLBR[n]) {
+    report += statisticLBR[n] + "\n";      n++;
+  }
+  report += "\n";   n=0;
+  while (statisticPAC[n]) {
+    report += statisticPAC[n] + "\n";      n++;
+  }
+  report += "\n";   n=0;
+  while (statisticValPacLay[n]) {
+    report += statisticValPacLay[n] + "\n", n++;
+  }
+  report += "\n----------------------------\n";
+  n=0;
+  while (statisticRECT[n]) {
+    report += statisticRECT[n] + "\n";      n++;
+  }
+  report += LabelcntRECT + "\n";
+  report += "\n----------------------------\n";
+  n=0;
+
+  report += statisticRectANYlayer[0] + "\n";
+
+  report += "\n----------------------------\n";
+  n=0;
+  while (statisticTEXTsize[n]) {
+    report += statisticTEXTsize[n] + "\n";
+    n++;
+  }
+  report += LabelcntTextSize + "\n";
+
+  report += "\n";   n=0;
+  while (statisticTEXTw[n]) {
+    report += statisticTEXTw[n] + "\n";
+    n++;
+  }
+  report += LabelcntTextWidth + "\n";
+
+  report += "\n";   n=0;
+  while (statisticPlaceTEXTsize[n]) {
+    report += statisticPlaceTEXTsize[n] + "\n";
+    n++;
+  }
+  report += LabelcntPlaceTextSize + "\n";
+
+  while (statisticPlaceTEXTw[n]) {
+    report += statisticPlaceTEXTw[n] + "\n";
+    n++;
+  }
+  report += LabelcntPlaceTextWidth + "\n";
+
+  report += "\n";   n=0;
+  while (statisticCIRdiam[n]) {
+    report += statisticCIRdiam[n] + "\n";
+    n++;
+  }
+  report += LabelcntCIRCLE + "\n";
+
+  report += "\n";
+  if (falseSignalCnt) {
+    report += "False signals:\n"; // 2009-02-11
+    for (n = 0; n < falseSignalCnt; n++) {
+      report += statisticFalseSignals[n]+"\n";
+    }
+  }
+  if (deleteRudimentalSignalName) {  // 2009-02-12
+    report += "\n";
+    report += "Rudimentarily signal name(s):\n";
+    report += deleteRudimentalSignalName;
+    report += "\n";
+  }
+  report += "End report";
+  report += "\n";
+  return report;
+}
+
+
+void drillStackRack(int rack, real drill) { // 2009-10-15 missing 2cnd dimension for array, realize by string(split)
+  string drillstr;
+  sprintf(drillstr, "%.2f", drill); // 2012-11-19 reduce real to 2 decimal to compare
+  string d[];
+  string Drills[];
+  int  cDrills[];
+  int cntDrills = strsplit(d, StackDrills[rack], '\t') / 2;  // definition : drill \t count \t drill \t count ....
+  int found = 0;
+  int n;
+
+  for (n = 0; n <= cntDrills; n++) {
+    Drills[n]  = d[n*2];
+    cDrills[n] = strtol(d[n*2+1]);
+    if (Drills[n] == drillstr){
+      cDrills[n]++;
+      found = 1;
+    }
+  }
+  if (!found) {
+    Drills[cntDrills] = drillstr;
+    cDrills[cntDrills]++;
+    cntDrills++;
+  }
+  string s;
+  StackDrills[rack] = ""; // clear string to generate new, with new counter
+  for (n = 0; n < cntDrills; n++) {
+    sprintf(s, "%s\t%d\t", Drills[n], cDrills[n]);
+    StackDrills[rack]+=s;
+  }
+  return;
+}
+
+
+void showLayerRack(int sel) {
+  string d[];
+  int cntDrills = strsplit(d, StackDrills[sel], '\t') / 2;  // definition : drill \t count \t drill \t count ....
+  showStackDrills[0] = "";
+  int n;
+  for (n = 0; n < cntDrills; n++) {
+    sprintf(showStackDrills[n], "%s\t%s", d[n*2], d[n*2+1]);
+  }
+  showStackDrills[n] = ""; // clear last string
+  return;
+}
+
+
+void  viaStackRack(int start, int end, string comment, real drill) {  // 2009-10-15 new drill
+  string sstack = "";
+  sprintf(sstack, "%02d-%02d%s", start, end, comment);
+  int notfound = 1;
+  int stc = 0;
+  for (stc = 0; stc < cntStack; stc ++) {
+    if (sstack == ViaStack[stc]) {
+      drillStackRack(stc, drill);          // 2009-10-15 add drill to stack rack
+      ViaStackCnt[stc]++;
+      notfound = 0;
+      break;
+    }
+  }
+  if (notfound) {
+    ViaStack[cntStack] = sstack;           // 2009-10-15 add drill to stack rack
+    drillStackRack(cntStack, drill);       // cound drill
+    ViaStackCnt[cntStack]++;
+    cntStack++;
+  }
+  return;
+}
+
+
+real WireLength(int x1, int x2, int y1, int y2) {
+  return sqrt( pow(u2u(x2) - u2u(x1), 2) + pow( u2u(y2) - u2u(y1), 2));
+}
+
+
+real WireLengthCircle(real r) {
+  return u2u(r * 2 * PI) ;
+}
+
+
+real WireLengthArc(real startangle, real endangle, int r) {
+  return u2u(r * 2 * PI) / 360 * (endangle - startangle);
+}
+
+
+void checkmaxmin(int x1, int x2, int y1, int y2, int width) {
+  int w = 0;
+  if (width) w = width/2;  // 2005-07-05 alf
+  if (x1 > maxX) maxX = x1+w;
+  if (x2 > maxX) maxX = x2+w;
+  if (y1 > maxY) maxY = y1+w;
+  if (y2 > maxY) maxY = y2+w;
+  if (x1 < minX) minX = x1-w;
+  if (x2 < minX) minX = x2-w;
+  if (y1 < minY) minY = y1-w;
+  if (y2 < minY) minY = y2-w;
+  return;
+}
+
+void checkHole( int x, int y, int drill ) {
+  checkmaxmin( x - drill/2, x + drill/2, y - drill/2, y + drill/2 , 0);
+  return;
+}
+
+
+void checkarc( int x1, int x2, int y1, int y2, int xc, int yc, real angle1, real angle2, real radius, int width) {
+  checkmaxmin( x1, x2, y1, y2, width );
+  if     ( angle2 > angle1 + 270.0) {
+    if     ( angle1 < 90  ) checkmaxmin( x1         , xc - radius, yc + radius, yc - radius, width );
+    else if( angle1 < 180 ) checkmaxmin( xc - radius, xc + radius, y1         , yc - radius, width );
+    else if( angle1 < 270 ) checkmaxmin( x1         , xc + radius, yc - radius, yc + radius, width );
+    else if( angle1 < 360 ) checkmaxmin( xc + radius, xc - radius, y1         , yc + radius, width );
+  }
+  else if( angle2 > angle1 + 180.0) {
+    if     ( angle1 < 90  ) checkmaxmin( x1         , xc - radius, yc + radius, y2         , width );
+    else if( angle1 < 180 ) checkmaxmin( x1         , xc - radius, yc - radius, y2         , width );
+    else if( angle1 < 270 ) checkmaxmin( x1         , xc + radius, yc - radius, y2         , width );
+    else if( angle1 < 360 ) checkmaxmin( x1         , xc + radius, yc + radius, y2         , width );
+  }
+  else if( angle2 > angle1 + 90.0 ) {
+    if     ( angle1 < 90  ) checkmaxmin( x1         , x2         , yc + radius, y2         , width );
+    else if( angle1 < 180 ) checkmaxmin( x1         , xc - radius, y1         , y2         , width );
+    else if( angle1 < 270 ) checkmaxmin( x1         , x2         , yc - radius, y2         , width );
+    else if( angle1 < 360 ) checkmaxmin( x1         , xc + radius, y1         , y2         , width );
+  }
+  else { // 2010-10-13 alf
+    if     ( angle1 <  90 && angle2 >  90 ) checkmaxmin( x1         , x2         , yc + radius, y2         , width );
+    else if( angle1 < 180 && angle2 > 180 ) checkmaxmin( x1         , xc - radius, y1         , y2         , width );
+    else if( angle1 < 270 && angle2 > 270 ) checkmaxmin( x1         , x2         , yc - radius, y2         , width );
+    else if( angle1 < 360 && angle2 > 360 ) checkmaxmin( x1         , xc + radius, y1         , y2         , width );
+  }
+  return;
+}
+
+
+void checkpad( int x, int y, int diameter1, int diameter16, int shape1, int shape16, int P_elongation) {
+  int d = diameter1;
+  int d2 = diameter1 / 2;
+  if (shape16 == PAD_SHAPE_LONG)   d = diameter1 * (diameter1 * P_elongation / 100);
+  if (shape16 == PAD_SHAPE_OFFSET) d = diameter1 * (diameter1 * P_elongation / 100) * 1.5;
+  checkmaxmin( x + d2, x - d2, y + d2, y - d2, 0 );
+  return;
+}
+
+
+void checksmd( int x, int y, int smddx, int smddy, int Layer) {
+  int dx2 = smddx / 2;
+  int dy2 = smddx / 2;
+  checkmaxmin( x + dx2, x - dx2, y + dy2, y - dy2, 0 );
+  return;
+}
+
+
+real ArcLength(real ang1, real ang2, real radius) {
+  return radius  * 2 * PI / 360 * (ang2 - ang1);
+}
+
+
+string NetClassLabel(string ClassName , int cnt) {
+  string s;
+  sprintf(s, "CLASS %s : %d Netze", ClassName , cnt);
+  return s;
+}
+
+
+string isempty(string s) {
+  if (!s) s = empty;
+  return s;
+}
+
+
+void list_pac_drills(int drill) {
+  int n;
+  for ( n = 0; n <= cnt_d; n++) {
+    if (pac_drill[n] == drill) {
+      cntpac_drill[n]++;
+      break;
+    }
+  }
+  if (n > cnt_d) {           // a new drill
+    cnt_d++;
+    pac_drill[cnt_d] = drill;
+    cntpac_drill[cnt_d]++;
+    pac_drill[cnt_d+1] = 0;
+  }
+  return;
+}
+
+
+void list_pac_holes(int drill) {
+  int n;
+  for ( n = 0; n <= cnt_h; n++) {
+    if (pac_hole[n] == drill) {
+      cntpac_hole[n]++;
+      break;
+    }
+  }
+  if (n > cnt_h) {           // a new drill
+    cnt_h++;
+    pac_hole[cnt_h] = drill;
+    cntpac_hole[cnt_h]++;
+    pac_hole[cnt_h+1] = 0;
+  }
+  return;
+}
+
+
+string infoDril(UL_ELEMENT E) {
+  string s, h;
+  cnt_d = -1;
+  cnt_h = -1;
+  cntpac_drill[0] = 0;
+  cntpac_hole[0] = 0;
+  E.package.holes(H) list_pac_holes(H.drill);
+
+  if (cnt_d > -1) {
+    s += "Drills:\n";
+    for (int n = 0; n <= cnt_d; n++) {
+      sprintf(h, "%d\t%.4f mm\n", cntpac_drill[n], u2mm(pac_drill[n]) );
+      s += h;
+    }
+  }
+  if (cnt_h > -1) {
+    s += "Holes:\n";
+    for (int n = 0; n <= cnt_h; n++) {
+      sprintf(h, "%d\t%.4f mm\n", cntpac_hole[n], u2mm(pac_hole[n]) );
+      s += h;
+    }
+  }
+  if (cnt_d > -1 || cnt_h > -1) s += "------\n";
+  return s;
+}
+
+void infoLBR( string val) {
+  linfo = "Element : Value : Package";
+  string s, M;
+  board(B) {
+    B.elements(E) {
+      if (E.package.library == val) {
+        sprintf(s, "%s %s(%.3f %.3f)\t: %s\t: %s\n", E.name, M, u2u(E.x), u2u(E.y), isempty(E.value), E.package.name);
+        Element_info += s;
+      }
+    }
+  }
+  return;
+}
+
+void infoPAC( string val) {
+  linfo = "Element : Value : Library";
+  string s, M;
+  int getdrill = 0;
+  board(B) B.elements(E) if (E.package.name == val) {
+    if (E.mirror) M = "Bot ";
+    else M = "Top ";
+    if (!getdrill) {
+      Element_info += infoDril(E);
+      getdrill++;
+    }
+    sprintf(s, "%s %s(%.3f %.3f)\t: %s\t: %s\n", E.name, M, u2u(E.x), u2u(E.y), isempty(E.value), E.package.library);
+    Element_info += s;
+  }
+  return;
+}
+
+
+void infoVAL( string val) {
+  string s, M;
+  int pos = strstr(val, empty);
+  if (pos == 0) {
+    linfo = "Package : Library";
+    val = strsub(val, strlen(empty));
+    board(B) B.elements(E) if (E.name == val) {
+      sprintf(Element_info, "Value empty/leer\n");
+      if (E.mirror) M = "Bot ";
+      else M = "Top ";
+      sprintf(s, "%s %s(%.3f %.3f) %s\t: %s\n", E.name, M, u2u(E.x), u2u(E.y), E.package.name, E.package.library);
+      Element_info += s;
+    }
+
+  }
+  else {
+    linfo = "Element : Package : Library";
+    board(B) B.elements(E) if (E.value == val) {
+      if (E.mirror) M = "Bot ";
+      else M = "Top ";
+      sprintf(s, "%s %s(%.3f %.3f)\t: %s\t: %s\n\n", E.name, M, u2u(E.x), u2u(E.y), E.package.name, E.package.library);
+      Element_info += s;
+    }
+  }
+  return;
+}
+
+
+void get_Info(int art, string val) {
+  Element_info = "";
+  int pos = strchr(val, '\t', 0);
+  val = strsub(val, 0, pos);
+  switch(art) {
+    case 1  : infoLBR(val);
+              break;
+
+    case 2  : infoPAC(val);
+              break;
+
+    case 3  : infoVAL(val);
+              break;
+
+    default : break;
+  }
+  return;
+}
+
+
+void resetMaxMin(void) {
+  maxX = INT_MIN;
+  minX = INT_MAX;
+  maxY = INT_MIN;
+  minY = INT_MAX;
+  return;
+}
+
+
+// *** used area in board to calculate if board area enuff ***
+
+real used_area(UL_ELEMENT E) {
+  resetMaxMin();
+  E.package.circles(C) {
+    if (C.layer == 1 || C.layer == 16 || C.layer == 21 ||  C.layer == 22 ||  C.layer == 51 ||  C.layer == 52 )
+        checkmaxmin( C.x - C.radius, C.x + C.radius, C.y - C.radius, C.y + C.radius, C.width );
+  }
+  E.package.wires(W) {
+    if (W.layer == 1 || W.layer == 16 || W.layer == 21 ||  W.layer == 22 ||  W.layer == 51 ||  W.layer == 52 ) {
+      if (W.arc) {
+        checkarc(W.arc.x1, W.arc.x2, W.arc.y1, W.arc.y2, W.arc.xc, W.arc.yc, W.arc.angle1, W.arc.angle2, W.arc.radius, W.width);
+      }
+      else  checkmaxmin( W.x1, W.x2, W.y1, W.y2, W.width );
+    }
+  }
+  E.package.contacts(CON) {
+    if (CON.pad) checkpad(CON.pad.x, CON.pad.y, CON.pad.diameter[1], CON.pad.diameter[16], CON.pad.shape[1], CON.pad.shape[16], CON.pad.elongation);
+    else         checksmd(CON.smd.x, CON.smd.y, CON.smd.dx[CON.smd.layer], CON.smd.dy[CON.smd.layer], CON.smd.layer);
+  }
+  E.package.holes(H)  checkHole( H.x, H.y, H.drill );
+  E.package.rectangles(R) {
+    if (R.layer == 1 || R.layer == 16 || R.layer == 21 ||  R.layer == 22 ||  R.layer == 51 ||  R.layer == 52 )
+        checkmaxmin( R.x1, R.x2, R.y1, R.y2, 0 );
+  }
+  E.package.texts(T) {
+    T.wires(W) {
+      if (W.layer == 1 || W.layer == 16 || W.layer == 21 ||  W.layer == 22 ||  W.layer == 51 ||  W.layer == 52 ) {
+        if (W.arc) {
+          checkarc(W.arc.x1, W.arc.x2, W.arc.y1, W.arc.y2, W.arc.xc, W.arc.yc, W.arc.angle1, W.arc.angle2, W.arc.radius, W.width);
+        }
+        else  checkmaxmin( W.x1, W.x2, W.y1, W.y2, W.width );
+      }
+    }
+  }
+  int mx = maxX -  minX;
+  int my = maxY -  minY;
+  return u2u(mx) * u2u(my);
+}
+
+
+// main
+if (board) {
+  board(B) {
+    brdfile = B.name;
+    int n;
+    string usedLayers;
+    string displayUnrouted;
+    status("Layer");
+    B.layers(L) {
+      string sl;
+      sprintf(sl, "%3d\t%s\t%d", L.number, L.name, L.used);
+      allLayers[cntalllay] = sl;
+      cntalllay++;
+      string Lnam = L.name;
+      if (Lnam[0] == '$') {
+        SupplyLayers[L.number] = 1; // 2009-07-15 check polygon on supply layer
+        SupplyLayerName[L.number] = L.name;
+      }
+      if (L.used && L.number >=1 && L.number <= 16) {
+        cntLayer++;
+        sprintf(sl, "%2d %s\n", L.number, L.name);
+        usedLayers += sl;
+        if (L.number == 1 || L.number == 16) {
+          sl = L.name;
+          if (sl[0] == '$') {
+            sprintf( sl, "Do not use Layer %.d %s for Powerplane! '$' in Layer Name.", L.number, L.name);
+            layerError += "\n" + sl;
+            sprintf( sl, "<br>Do not use Layer <font color=red>%.d %s</font> for Powerplane!", L.number, L.name);
+            displayLayerError += sl;
+          }
+        }
+      }
+    }
+    if (layerError) {
+      layerError += "\n\nUse only inner layer (2 to 15) for Powerplane!\n";
+      displayLayerError = "<nobr>" + displayLayerError + "</font><br>" +
+                          "<br>Only use layer <font color=blue>2 - 15</font> for power planes.</nobr>";
+      dlgMessageBox(displayLayerError, "Ok");
+    }
+    sprintf(usedLayer, "used layers %d\n\n%s", cntLayer, usedLayers);
+
+    status("Elements");
+    B.elements(E) {
+      // calculate over xPlace/xDocu/PAD/SMD  12.05.2005 alf@cadsoft.de
+      if (E.locked) cntLocked++;
+      if (strstr(E.name, "TP") == 0) cntTPelement++; // 2010-06-09 TP = Testpoint
+      else {
+        cntElement++;
+        Ename[cntElement] = E.name;
+        ELocked[cntElement] = E.locked;
+        eUsedLayer[cntElement] = E.mirror;
+        eUsedArea[cntElement] = used_area(E); // berechne für jedes Element(Package) den benötigten Platz
+        summary_area += eUsedArea[cntElement];
+      }
+      int cont = 0; // 2009-12-02 package with or without contacts
+      E.package.contacts(C) {
+        if (C.pad) list_pac_drills(C.pad.drill);
+        cont = 1;
+      }
+      if (cont) {
+        EContact[cntCont] = E.name;
+        cntCont++;
+      }
+      else {
+        sprintf(EnoContact[cntNoCont], "%s\t%s", E.name, E.package.name);
+        cntNoCont++;
+      }
+    }
+
+    resetMaxMin();
+    status("Wires");
+    B.wires(W) {
+      if (W.layer == 20) {
+        if (W.arc) {
+          outlines += ArcLength(W.arc.angle1, W.arc.angle2, u2u(W.arc.radius));
+          checkarc(W.arc.x1, W.arc.x2, W.arc.y1, W.arc.y2, W.arc.xc, W.arc.yc, W.arc.angle1, W.arc.angle2, W.arc.radius, W.width);
+        }
+        else {
+          outlines += WireLength(W.x1, W.x2, W.y1, W.y2);
+          checkmaxmin( W.x1, W.x2, W.y1, W.y2, W.width );
+        }
+      }
+    }
+    status("Circles");
+    B.circles(C) {
+      if (C.layer == 20) {
+        outlines += WireLengthCircle(C.radius);
+        checkmaxmin( C.x - C.radius, C.x + C.radius, C.y - C.radius, C.y + C.radius, C.width );
+      }
+    }
+    B.elements(E) {
+      status("Element:"+E.name);
+
+/* zombie
+      if (E.name == "U$1") {
+        string hh;
+        sprintf(hh, "%s = %s : %.4f %.4f", E.name, E.value, u2u(E.x), u2u(E.y) );
+        if (dlgMessageBox(hh, "OK", "Cancel") != 0) exit(-999);
+      }
+zombie */
+
+      E.package.wires(W) {
+        if (W.layer == 20) { // *** Dimension in Packages ***
+          if (W.arc) {
+            outlines += ArcLength(W.arc.angle1, W.arc.angle2, u2u(W.arc.radius));
+            checkarc(W.arc.x1, W.arc.x2, W.arc.y1, W.arc.y2, W.arc.xc, W.arc.yc, W.arc.angle1, W.arc.angle2, W.arc.radius, W.width);
+          }
+          else {
+            outlines += WireLength(W.x1, W.x2, W.y1, W.y2);
+            checkmaxmin( W.x1, W.x2, W.y1, W.y2, W.width );
+          }
+        }
+      }
+      E.package.circles(C) {
+        if (C.layer == 20) {
+          outlines += WireLengthCircle(C.radius);
+          checkmaxmin( C.x - C.radius, C.x + C.radius, C.y - C.radius, C.y + C.radius, C.width );
+        }
+        if (C.layer == 29) lSTOPpac[0]++;  // count circle in Stop-Layer 2006-04-28
+        if (C.layer == 30) lSTOPpac[1]++;
+        if (C.layer == 31) lCREAMpac[0]++;  // count circle in Cream-Layer
+        if (C.layer == 32) lCREAMpac[1]++;
+      }
+      E.package.polygons(P) {
+        if (!P.width) PolyWidthError = 1;
+        P.wires(W) {
+          if (W.width < 10) {
+            sprintf(PolygonLayer[cPolygonL], "Package\t%s.PAC \t%d\t%d\t%.4f", E.package.name, W.layer, P.rank, u2mm(P.width));
+            cPolygonL++;
+          }
+          break;
+        }
+        if (P.layer == 29) lSTOPpac[0]++;  // count polygon in Stop-Layer 2006-04-28
+        if (P.layer == 30) lSTOPpac[1]++;
+        if (P.layer == 31) lCREAMpac[0]++;  // count polygon in Cream-Layer
+        if (P.layer == 32) lCREAMpac[1]++;
+      }
+      E.package.rectangles(R) {
+        if (R.layer == 29) lSTOPpac[0]++;  // count rect in Stop-Layer 2006-04-28
+        if (R.layer == 30) lSTOPpac[1]++;
+        if (R.layer == 31) lCREAMpac[0]++;  // count rect in Cream-Layer
+        if (R.layer == 32) lCREAMpac[1]++;
+      }
+    }
+
+    if (outlines) {
+       sprintf(brdoutline, "Outline contour = %.2f", outlines);
+       sprintf(brdmaximum, "max. Board length (Layer 20)\nX = %.2f\nY = %.2f",  WireLength(minX, maxX, 0,0), WireLength(minY, maxY, 0, 0) );
+    }
+
+    B.classes(CL) {
+      // Net classes ********************
+      NetClassNr[CL.number] = CL.number;
+      NetClassName[CL.number] = CL.name;
+      NetClassWidth[CL.number] = CL.width;
+      NetClassClear[CL.number] = CL.clearance;
+      NetClassDrill[CL.number] = CL.drill;
+      cNetClass[CL.number] = 0;
+    }
+    B.signals(S) {
+      status("Signal:"+S.name);
+      int true = 0;      // only signal if connected to pad or smd is a true signal 2005-12-08 alf@cadsoft.de
+      S.contactrefs(C) {
+        true = 1;
+        break;
+      }
+      if (true) {
+        cNetClass[S.class.number]++;
+        sumSignals++;
+        SignalName[SignalCnt]  = S.name;
+        SignalClass[SignalCnt] = S.class.number;
+        SignalCnt++;
+        SignalClassList[S.class.number] += S.name + "\n";
+      }
+      else {
+        S.vias(V) {
+          cntfalseSignalVias[falseSignalCnt]++;
+          sprintf(FalsWxy[falseSignalCnt], "(%.4f %.4f) L %d-%d", u2mm(V.x), u2mm(V.y), V.start, V.end);
+
+        }
+        S.wires(W) {
+          cntfalseSignalWires[falseSignalCnt]++;
+          sprintf(FalsWxy[falseSignalCnt], "(%.4f %.4f) L %d", u2mm(W.x1), u2mm(W.y1), W.layer);
+        }
+        if (cntfalseSignalWires[falseSignalCnt] || cntfalseSignalVias[falseSignalCnt]) {  // 2009-02-12
+          falseSignalList[falseSignalCnt] = S.name;  // only signal if connected to pad or smd is a true signal
+          falseSignalCnt++;
+        }
+        else {
+          string s;
+          sprintf(s, "WIRE '%s' (%.4f %.4f) (%.4f %.4f);DELETE (%.4f %.4f);\n",
+                        S.name,
+                        u2mm(B.area.x1)-1.0, u2mm(B.area.y1)-1.0,
+                        u2mm(B.area.x1)-2.0, u2mm(B.area.y1)-1.0,
+                        u2mm(B.area.x1)-1.0, u2mm(B.area.y1)-1.0
+                 );
+          deleteRudimentalSignalName+=s;
+        }
+      }
+
+      // Wires ********************
+      S.wires(W) {
+        if (W.layer < 19) {
+          if (W.arc) {
+            for (int n = 0; n <= cntArc; n++) {
+              if (ArcWidth[n] == W.arc.width) {
+                cArcWidth[n]++;
+                break;
+              }
+            }
+            if (n > cntArc) {
+              cntArc++;
+              ArcWidth[cntArc] = W.arc.width;
+              cArcWidth[cntArc]++;
+            }
+          }
+          else {
+            for (n = 0; n <= cntWire; n++) {
+              if (WireWidth[n] == W.width) {
+                cWireWidth[n]++;
+                break;
+              }
+            }
+            if (n > cntWire) {
+              cntWire++;
+              WireWidth[cntWire] = W.width;
+              cWireWidth[cntWire]++;
+            }
+          }
+        }
+        else {
+          SignalUnrouted++;
+        }
+      }
+
+      // Polygone *********************
+      S.polygons(P) {
+        // Polygon Wire width *********
+        if (SupplyLayers[P.layer]) {
+          SupplyLayersUsedPolygons[P.layer]++;
+        }
+        if (!P.width) PolyWidthError = 1;
+        P.wires(W) {
+          sprintf(PolygonLayer[cPolygonL], "Signal\t%s\t%d\t%d\t%.3f", S.name, P.layer, P.rank, u2mm(W.width) );
+                                           // Polygon Rank 19.07.2005 alf
+          cPolygonL++;
+          break;
+        }
+        for (n = 0; n <= cntPolyW; n++) {
+          if (PolygonWidth[n] == P.width) {
+            cPolygonWidth[n]++;
+            break;
+          }
+        }
+        if (n > cntPolyW) {
+          cntPolyW++;
+          PolygonWidth[cntPolyW] = P.width;
+          cPolygonWidth[cntPolyW]++;
+        }
+        // Polygon isolate *********
+        for (n = 0; n <= cntPolyIso; n++) {
+          if (PolygonIsolate[n] == P.isolate) {
+            cPolygonIsolate[n]++;
+            break;
+          }
+        }
+        if (n > cntPolyIso) {
+          cntPolyIso++;
+          PolygonIsolate[cntPolyIso] = P.isolate;
+          cPolygonIsolate[cntPolyIso]++;
+        }
+      }
+
+      // Vias *********************
+      S.vias(V) {
+        cntVias ++; // 2012-05-24
+        // Vias Drill *********************
+        int n;
+        for (n = 0; n <= cntVDril; n++) {
+          if (ViaDrill[n] == V.drill) {
+            cViaDrill[n]++;
+            break;
+          }
+        }  //2012-11-19
+        if (n > cntVDril) {
+          cntVDril++;
+          ViaDrill[cntVDril] = V.drill;
+          cViaDrill[cntVDril]++;
+        }
+        // Vias Diameter TOP *********************
+        for (n = 0; n <= cntVDiam; n++) {
+          if (ViaDiameter[n] == V.diameter[LAYER_BOTTOM]) {
+            cViaDiameter[n]++;
+            break;
+          }
+        }
+        if (n > cntVDiam) {
+          cntVDiam++;
+          ViaDiameter[cntVDiam] = V.diameter[LAYER_BOTTOM];
+          cViaDiameter[cntVDiam]++;
+        }
+
+        // Vias Diameter Inner Layer *********************
+        for (n = 0; n <= cntVDiamI; n++) {
+          if (ViaDiameterI[n] == V.diameter[2]) {
+            cViaDiameterI[n]++;
+            break;
+          }
+        }
+        if (n > cntVDiamI) {
+          cntVDiamI++;
+          ViaDiameterI[cntVDiamI] = V.diameter[2];
+          cViaDiameterI[cntVDiamI]++;
+        }
+
+        // Vias Restring Top Bottom *********************
+        int VRestringO = (V.diameter[LAYER_BOTTOM] - V.drill ) / 2;
+        for (n = 0; n <= cntVringO; n++) {
+          if (ViaRestringO[n] == VRestringO) {
+            cViaRestringO[n]++;
+            break;
+          }
+        }
+        if (n > cntVringO) {
+          cntVringO++;
+          ViaRestringO[cntVringO] = VRestringO;
+          cViaRestringO[cntVringO]++;
+        }
+        // Vias Restring Inner Layer *********************
+        int VRestringI = (V.diameter[2] - V.drill ) / 2;
+        for (n = 0; n <= cntVringI; n++) {
+          if (ViaRestringI[n] == VRestringI) {
+            cViaRestringI[n]++;
+            break;
+          }
+        }
+        if (n > cntVringI) {
+          cntVringI++;
+          ViaRestringI[cntVringI] = VRestringI;
+          cViaRestringI[cntVringI]++;
+        }
+        viaStackRack(V.start, V.end, "", u2mm(V.drill));
+      }
+      S.contactrefs(C) {
+        cnt_pad_on_signal++;
+      }
+    }
+
+  B.holes(H) {
+    // Holes Board *********************
+    for (int n = 0; n <= cntHole; n++) {
+      if (Hole[n] == H.drill) {
+        cHole[n]++;
+        break;
+      }
+    }
+    if (n > cntHole) {
+      cntHole++;
+      Hole[cntHole] = H.drill;
+      cHole[cntHole]++;
+    }
+  }
+  B.circles(C) {
+    if (C.layer < 19) {
+      int n;
+      for (n = 0; n < cntCircl; n++) {  // 2012-01-11
+        if (CirclWidth[n] == C.width) {
+          cCirclWidth[n]++;
+          break;
+        }
+      }
+      if (n == cntCircl ) {  // 2012-01-11
+        CirclWidth[cntCircl] = C.width;
+        cCirclWidth[cntCircl]++;
+        cntCircl++;
+      }
+      for (n = 0; n < cntCirclDiam; n++) {  // 2012-01-11
+        if (CirclDiam[n] == C.radius*2) {
+          cCirclDiam[n]++;
+          break;
+        }
+      }
+      if (n == cntCirclDiam ) {  // 2012-01-11
+        CirclDiam[cntCirclDiam] = C.radius*2;
+        cCirclDiam[cntCirclDiam]++;   // 2012-01-11
+        cntCirclDiam++;
+      }
+      sumcntCircl++;
+    }
+    if (C.layer == 29) lSTOPbrd[0]++;  // count circle in Stop-Layer 2006-04-28
+    if (C.layer == 30) lSTOPbrd[1]++;
+    if (C.layer == 31) lCREAMbrd[0]++;  // count circle in Cream-Layer
+    if (C.layer == 32) lCREAMbrd[1]++;
+  }
+
+  B.rectangles(R) {
+    if (R.layer < 19) {
+      int r_x = R.x2 - R.x1;
+      int r_y = R.y2 - R.y1;
+      for (int n = 0; n < cntRECT; n++) {
+        if ( RECTx[n] == r_x && RECTy[n] == r_y ) {
+          cRECT[n]++;
+          break;
+        }
+      }
+      if (n == cntRECT ) {
+        RECTx[cntRECT] = r_x;
+        RECTy[cntRECT] = r_y;
+        cRECT[cntRECT]++;
+        cntRECT++;
+      }
+      sumcntRECT++;
+    }
+    else if (R.layer == 29) lSTOPbrd[0]++;  // count rect in Stop-Layer 2006-04-28
+    else if (R.layer == 30) lSTOPbrd[1]++;
+    else if (R.layer == 31) lCREAMbrd[0]++;  // count rect in Cream-Layer
+    else if (R.layer == 32) lCREAMbrd[1]++;
+    else cntRectANYlayer[R.layer]++;
+  }
+  status("Text");
+  B.texts(T) {
+    if (T.layer < 19) {
+      for (int n = 0; n <= cntTextSize; n++) {
+        if (TextSize[n] == T.size) {
+          cTextSize[n]++;
+          break;
+        }
+      }
+      if (n > cntTextSize) {
+        cntTextSize++;
+        TextSize[cntTextSize] = T.size;
+        cTextSize[cntTextSize]++;
+      }
+      T.wires(W) {
+        for (int n = 0; n <= cntTextWidth; n++) {
+          if (TextWidth[n] == W.width) {
+            cTextWidth[n]++;
+            break;
+          }
+        }
+        if (n > cntTextWidth) {
+          cntTextWidth++;
+          TextWidth[cntTextWidth] = W.width;
+          cTextWidth[cntTextWidth]++;
+        }
+        break;
+      }
+    }
+    if (T.layer >= 21 && T.layer <= 27) {
+      for (int n = 0; n <= cntPlaceTextSize; n++) {
+        if (PlaceTextSize[n] == T.size) {
+          cPlaceTextSize[n]++;
+          break;
+        }
+      }
+      if (n > cntPlaceTextSize) {
+        cntPlaceTextSize++;
+        PlaceTextSize[cntPlaceTextSize] = T.size;
+        cPlaceTextSize[cntPlaceTextSize]++;
+      }
+      T.wires(W) {
+        for (int n = 0; n <= cntPlaceTextWidth; n++) {
+          if (PlaceTextWidth[n] == W.width) {
+            cPlaceTextWidth[n]++;
+            break;
+          }
+        }
+        if (n > cntPlaceTextWidth) {
+          cntPlaceTextWidth++;
+          PlaceTextWidth[cntPlaceTextWidth] = W.width;
+          cPlaceTextWidth[cntPlaceTextWidth]++;
+        }
+        break;
+      }
+    }
+  }
+
+  B.polygons(P) {
+    if (P.layer == 29) lSTOPbrd[0]++;  // count polygon in Stop-Layer 2006-04-28
+    if (P.layer == 30) lSTOPbrd[1]++;
+    if (P.layer == 31) lCREAMbrd[0]++;  // count polygon in Cream-Layer
+    if (P.layer == 32) lCREAMbrd[1]++;
+  }
+
+  B.elements(E) {
+    status("Package:"+E.package.name);
+    E.package.holes(H) {
+      // Holes Board *********************
+      for (int n = 0; n <= cntHole; n++) {
+        if (Hole[n] == H.drill) {
+          cHole[n]++;
+          break;
+        }
+      }
+      if (n > cntHole) {
+        cntHole++;
+        Hole[cntHole] = H.drill;
+        cHole[cntHole]++;
+      }
+    }
+
+    E.package.contacts(C) {
+      if (C.smd) {
+        if (C.smd.layer == LAYER_TOP) cntSMDt++;
+        else cntSMDb++;
+        for (int n = 0; n <= cntSMD; n++) {
+          if ( (SMDx[n] == C.smd.dx && SMDy[n] == C.smd.dy && rSMD[n] == C.smd.roundness) ) {  // 2010-03-10
+            cSMD[n]++;
+            break;
+          }
+        }
+        if (n > cntSMD) {
+          cntSMD++;
+          SMDx[cntSMD] = C.smd.dx;
+          SMDy[cntSMD] = C.smd.dy;
+          rSMD[cntSMD] = C.smd.roundness;    // 2010-03-10
+          cSMD[cntSMD]++;
+        }
+      }
+
+      if (C.pad) {
+        // Drills
+        viaStackRack(1, 16, "-PAD", u2mm(C.pad.drill));    // 2011-05-03 mark stack as pad in layer rack
+        for ( n = 0; n <= cntPDril; n++) {
+          if (PadDrill[n] == C.pad.drill) {
+            cPadDrill[n]++;
+            break;
+          }
+        }
+        if (n > cntPDril) {           // a new drill
+          cntPDril++;
+          PadDrill[cntPDril] = C.pad.drill;
+          cPadDrill[cntPDril]++;
+        }
+        // Bottom layer
+        for ( n = 0; n <= cntPDiamBOT; n++) {
+          if (PadDiameterBOT[n] == C.pad.diameter[LAYER_BOTTOM]) {
+            cPadDiameterBOT[n]++;
+            break;
+          }
+        }
+        if (n > cntPDiamBOT) {
+          cntPDiamBOT++;
+          PadDiameterBOT[cntPDiamBOT] = C.pad.diameter[LAYER_BOTTOM];
+          cPadDiameterBOT[cntPDiamBOT]++;
+        }
+        // Top layer
+        for (n = 0; n <= cntPDiamTOP; n++) {
+          if (PadDiameterTOP[n] == C.pad.diameter[LAYER_TOP]) {
+            cPadDiameterTOP[n]++;
+            break;
+          }
+        }
+        if (n > cntPDiamTOP) {
+          cntPDiamTOP++;
+          PadDiameterTOP[cntPDiamTOP] = C.pad.diameter[LAYER_TOP];
+          cPadDiameterTOP[cntPDiamTOP]++;
+        }
+        // Inner layer
+        for ( n = 0; n <= cntiPDiam; n++) {
+          if (iPadDiameter[n] == C.pad.diameter[2]) {
+            ciPadDiameter[n]++;
+            break;
+          }
+        }
+        if (n > cntiPDiam) {
+          cntiPDiam++;
+          iPadDiameter[cntiPDiam] = C.pad.diameter[2];
+          ciPadDiameter[cntiPDiam]++;
+        }
+        // Top-Restring *************************
+        int Trestring = (C.pad.diameter[LAYER_TOP] - C.pad.drill) / 2;
+        for ( n = 0; n <= cntPringTOP; n++) {
+          if (PadRestringTOP[n] == Trestring) {
+            cPadRestringTOP[n]++;
+            break;
+          }
+        }
+        if (n > cntPringTOP) {
+          cntPringTOP++;
+          PadRestringTOP[cntPringTOP] = Trestring;
+         cPadRestringTOP[cntPringTOP]++;
+        }
+
+        // Bottom-Restring *************************
+        int Brestring = (C.pad.diameter[LAYER_BOTTOM] - C.pad.drill) / 2;
+        for ( n = 0; n <= cntPringBOT; n++) {
+          if (PadRestringBOT[n] == Brestring) {
+            cPadRestringBOT[n]++;
+            break;
+          }
+        }
+        if (n > cntPringBOT) {
+          cntPringBOT++;
+          PadRestringBOT[cntPringBOT] = Brestring;
+          cPadRestringBOT[cntPringBOT]++;
+        }
+
+        // Inner-Restring *************************
+        int Irestring = (C.pad.diameter[2] - C.pad.drill) / 2;
+        for ( n = 0; n <= cntPringI; n++) {
+          if (PadRestringI[n] == Irestring) {
+            cPadRestringI[n]++;
+            break;
+          }
+        }
+        if (n > cntPringI) {
+          cntPringI++;
+          PadRestringI[cntPringI] = Irestring;
+          cPadRestringI[cntPringI]++;
+        }
+        int schape    = C.pad.shape[LAYER_TOP];
+        schape    = C.pad.shape[LAYER_BOTTOM];
+        schape    = C.pad.shape[2];
+      }
+    }
+    // Texte in Package [copper]
+    E.package.texts(T) {
+      if (T.layer < 19) {
+        T.wires(W) {
+          for (int n = 0; n <= cntTextWidth; n++) {
+            if (TextWidth[n] == W.width) {
+              cTextWidth[n]++;
+              break;
+            }
+          }
+          if (n > cntTextWidth) {
+            cntTextWidth++;
+            TextWidth[cntTextWidth] = W.width;
+            cTextWidth[cntTextWidth]++;
+          }
+          break;
+        }
+      }
+      if (T.layer >= 21 && T.layer <= 27) {
+        for (int n = 0; n <= cntPlaceTextSize; n++) {
+          if (PlaceTextSize[n] == T.size) {
+            cPlaceTextSize[n]++;
+            break;
+          }
+        }
+        if (n > cntPlaceTextSize) {
+          cntPlaceTextSize++;
+          PlaceTextSize[cntPlaceTextSize] = T.size;
+          cPlaceTextSize[cntPlaceTextSize]++;
+        }
+        T.wires(W) {
+          for (int n = 0; n <= cntPlaceTextWidth; n++) {
+            if (PlaceTextWidth[n] == W.width) {
+              cPlaceTextWidth[n]++;
+              break;
+            }
+          }
+          if (n > cntPlaceTextWidth) {
+            cntPlaceTextWidth++;
+            PlaceTextWidth[cntPlaceTextWidth] = W.width;
+            cPlaceTextWidth[cntPlaceTextWidth]++;
+          }
+          break;
+        }
+      }
+    }
+
+    // Wires in Package [copper]
+    E.package.wires(W) {
+      if (W.layer < 19) {
+        for (n = 0; n <= cntWire; n++) {
+          if (WireWidth[n] == W.width) {
+            cWireWidth[n]++;
+            break;
+          }
+        }
+        if (n > cntWire) {
+          cntWire++;
+          WireWidth[cntWire] = W.width;
+          cWireWidth[cntWire]++;
+        }
+      }
+    }
+
+    // Polygon wires in Package [copper]
+    E.package.polygons(P) {
+      if (P.layer < 19) {
+        for (n = 0; n <= cntPolyW; n++) {
+          if (PolygonWidth[n] == P.width) {
+            cPolygonWidth[n]++;
+            break;
+          }
+        }
+        if (n > cntPolyW) {
+          cntPolyW++;
+          PolygonWidth[cntPolyW] = P.width;
+          cPolygonWidth[cntPolyW]++;
+        }
+        // Polygon isolate *********
+        for (n = 0; n <= cntPolyIso; n++) {
+          if (PolygonIsolate[n] == P.isolate) {
+            cPolygonIsolate[n]++;
+            break;
+          }
+        }
+        if (n > cntPolyIso) {
+          cntPolyIso++;
+          PolygonIsolate[cntPolyIso] = P.isolate;
+          cPolygonIsolate[cntPolyIso]++;
+        }
+      }
+    }
+
+    // Rectangles in Package [copper]
+    E.package.rectangles(R) {
+      if (R.layer < 19) {
+        int r_x = R.x2 - R.x1;
+        int r_y = R.y2 - R.y1;
+        for (int n = 0; n <= cntRECT; n++) {
+          if ( RECTx[n] == r_x && RECTy[n] == r_y ) {
+            cRECT[n]++;
+            break;
+          }
+        }
+        if (n > cntRECT ) {
+          cntRECT++;
+          RECTx[cntRECT] = r_x;
+          RECTy[cntRECT] = r_y;
+          cRECT[cntRECT]++;
+        }
+      }
+    }
+
+    // Circles in Package [copper]
+    E.package.circles(C) {
+      if (C.layer < 19) {
+        for (int n = 0; n <= cntCircl; n++) {
+          if (CirclWidth[n] == C.width) {
+            cCirclWidth[n]++;
+            break;
+          }
+        }
+        if (n > cntCircl ) {
+          cntCircl++;
+          CirclWidth[cntCircl] = C.width;
+          cCirclWidth[cntCircl]++;
+        }
+        for (n = 0; n <= cntCirclDiam; n++) {
+          if (CirclDiam[n] == C.radius*2) {
+            cCirclDiam[n]++;
+            break;
+          }
+        }
+        if (n > cntCirclDiam ) {
+          cntCirclDiam++;
+          CirclDiam[cntCircl] = C.radius*2;
+          cCirclDiam[cntCirclDiam]++;
+        }
+        sumcntCircl++;
+      }
+      if (C.layer == 29) lSTOPbrd[0]++;  // count circle in Stop-Layer 2006-04-28
+      if (C.layer == 30) lSTOPbrd[1]++;
+      if (C.layer == 31) lCREAMbrd[0]++;  // count circle in Cream-Layer
+      if (C.layer == 32) lCREAMbrd[1]++;
+    }
+
+    // Masks in in Package
+    E.package.contacts(C) {
+      if (C.pad) {
+        if (C.pad.flags && PAD_FLAG_STOP) {
+          padlSTOP[0]++;  // top
+          padlSTOP[1]++;  // bottom
+        }
+      }
+      if (C.smd) {
+        if (C.smd.flags && SMD_FLAG_STOP)  smdlSTOP[E.mirror]++;
+        if (C.smd.flags && SMD_FLAG_CREAM) smdlCREAM[E.mirror]++;
+      }
+    }
+
+    // Element Libraries *********
+    for (n = 0; n <= cntLbr; n++) {
+      if (Lbr[n] == E.package.library) {
+        cLbr[n]++;
+        break;
+      }
+    }
+    if (n > cntLbr) {
+      cntLbr++;
+      Lbr[cntLbr] = E.package.library;
+      cLbr[cntLbr]++;
+    }
+    // Element Package *********
+    for (n = 0; n <= cntPacName; n++) {
+      if (PacName[n] == E.package.name) {
+        cPacName[n]++;
+        break;
+      }
+    }
+    if (n > cntPacName) {
+      cntPacName++;
+      PacName[cntPacName] = E.package.name;
+      cPacName[cntPacName]++;
+    }
+
+    // Element Value ********* 2005-12-01 alf@cadsoft.de
+/*
+    // -------- List by Value ------------
+    for (n = 0; n <= cntEValue; n++) {
+      if (EValue[n] == Ev) {
+        cEValue[n]++;
+        break;
+      }
+    }
+    if (n > cntEValue) {
+      cntEValue++;
+      EValue[cntEValue] = Ev;
+      cEValue[cntEValue]++;
+    }
+*/
+    // ----- List by Value/Package/Layer -----------
+    string Ev = E.value;
+    if (Ev == "") {
+      Ev = empty + E.name;
+      emptyValue++;
+    }
+    for (n = 0; n <= cntEVPL; n++) {
+      if (EVALpac[n] == Ev && EvalPAC[n] == E.package.name ) {
+        cEVPL[n]++;
+        if (E.mirror)  cEVPL16[n]++;
+        else  cEVPL1[n]++;
+        break;
+      }
+    }
+    if (n > cntEVPL) {
+      cntEVPL++;
+      EVALpac[cntEVPL] = Ev;
+      EvalPAC[cntEVPL] = E.package.name;
+      cEVPL[cntEVPL]++;
+      if (E.mirror)  cEVPL16[cntEVPL]++;
+      else  cEVPL1[cntEVPL]++;
+    }
+  }
+  status("creat list");
+
+  if (PolyWidthError) PolygonError = "! *** Do not use WIRE WIDTH 0 for Polygon if generate Gerber-Data *** !";
+  int x = 0;
+  // Statistic tabels
+  // Net Class ******************** 2014-11-27  support of 16 netclasses -ric
+  statisticCLASS[x] = "# \tName\tmin. Width\tClearance\tmin. Drill\tUsed";
+  for (n = 0; n < 16; n++) {
+    if (NetClassName[n]) {
+      if(minClearance > NetClassClear[n]) minClearance = NetClassClear[n];
+      x++;
+      sprintf(statisticCLASS[x], "%1d\t%s\t%s\t%s\t%s\t%-4d",
+                  NetClassNr[n],
+                  NetClassName[n],
+                  value(NetClassWidth[n], ""),
+                  value(NetClassClear[n], ""),
+                  value(NetClassDrill[n], ""),
+                  cNetClass[n]
+             );
+      selNetClassNr[x] = NetClassNr[n];
+    }
+  }
+
+  x = 0;
+  // false Signals ******************** 2005-12-08 alf@cadsoft.de
+  statisticFalseSignals[x] = "Signal-Name\tVias\tCoordinate Layer";
+  for (n = 0; n < falseSignalCnt; n++) {
+    x++;
+    sprintf( statisticFalseSignals[x], "%s\t%d\t%s",
+                    falseSignalList[n],  // only signal if connected to pad or smd is a true signal 2005-12-08 alf@cadsoft.de
+                    cntfalseSignalVias[n],
+                    FalsWxy[n]
+           );
+  }
+
+    // ************* Wire statistic *****************
+    x = 0;
+    statisticWirew[x] = "WIRE\tQ.";
+    for (n = 0; n <= cntWire; n++) {
+      if (cWireWidth[n]) {
+        sumWires += cWireWidth[n];
+        if(minWires > WireWidth[n]) minWires = WireWidth[n];
+        x++;
+        sprintf(statisticWirew[x], "%s\t%-4d", value(WireWidth[n], ""), cWireWidth[n] );
+      }
+    }
+
+    x = 0;
+    statisticARCw[x] = "ARC\tQ.";
+    for ( n = 0; n <= cntArc; n++) {
+      if (cArcWidth[n]) {
+        sumARCw += cArcWidth[n];
+        if(minARCw > ArcWidth[n]) minARCw = ArcWidth[n];
+        x++;
+        sprintf(statisticARCw[x], "%s\t%-4d", value(ArcWidth[n], ""), cArcWidth[n] );
+      }
+    }
+
+    x = 0;
+    statisticCIRw[x] = "CIRCLE (width)\tQ.";
+    for ( n = 0; n <= cntCircl; n++) {
+      if (cCirclWidth[n]) {
+        sumCIRCw += cCirclWidth[n];
+        if(minCIRCw > CirclWidth[n]) minCIRCw = CirclWidth[n];
+        x++;
+        sprintf(statisticCIRw[x], "%s\t%-4d", value(CirclWidth[n], ""), cCirclWidth[n] );
+      }
+    }
+
+    x = 0;
+    statisticCIRdiam[x] = "CIRCLE diam.\tQ.";
+    for ( n = 0; n <= cntCirclDiam; n++) {
+      if (cCirclDiam[n]) {
+        sumCIRCdiam += cCirclDiam[n];
+        if(minCIRCdiam > CirclDiam[n]) minCIRCdiam = CirclDiam[n];
+        x++;
+        sprintf(statisticCIRdiam[x], "%s\t%-4d", value(CirclDiam[n], ""), cCirclDiam[n] );
+      }
+    }
+
+    x = 0;
+    statisticPolyw[x] = "POLY. width\tQ.";
+    for ( n = 0; n <= cntPolyW; n++) {
+      if (cPolygonWidth[n]) {
+        sumPOLYw += cPolygonWidth[n];
+        if(minPOLYw > PolygonWidth[n]) minPOLYw = PolygonWidth[n];
+        x++;
+        sprintf(statisticPolyw[x], "%s\t%-4d", value(PolygonWidth[n], ""), cPolygonWidth[n]);
+        // ATTENTION : Width saved in .2 Micron
+      }
+    }
+
+    x = 0;
+    statisticPoliso[x] = "POLY. Isol.\tQ.";
+    for ( n = 0; n <= cntPolyIso; n++) {
+      if (cPolygonIsolate[n]) {
+        sumISOL += cPolygonIsolate[n];
+        if(minISOL > PolygonIsolate[n]) minISOL = PolygonIsolate[n];
+        x++;
+        sprintf(statisticPoliso[x], "%s\t%-4d", value(PolygonIsolate[n], ""), cPolygonIsolate[n]);
+      }
+    }
+
+    x = 0;
+    statisticRECT[x] = "RECT x\tRECT y\tQ.";
+    for ( n = 0; n <= cntRECT; n++) {
+      if (cRECT[n]) {
+        sumRECT += cRECT[n];
+        if(minRECTx > RECTx[n]) minRECTx = RECTx[n];
+        if(minRECTy > RECTy[n]) minRECTy = RECTy[n];
+        x++;
+        sprintf(statisticRECT[x], "%s\t%s\t%-4d", value(RECTx[n], ""), value(RECTy[n], ""), cRECT[n]);
+      }
+    }
+
+    x = 0;
+    sprintf(statisticRectANYlayer[0], "RECT Layer\tQ.");
+    int xr = 1;
+    for ( n = 1; n < 256; n++) {
+      if (cntRectANYlayer[n]) {
+        sumAnyRECT += cntRectANYlayer[n];
+        sprintf(statisticRectANYlayer[xr], "%d\t%-4d", n, cntRectANYlayer[n]);
+        xr++;
+      }
+    }
+    sprintf(statisticSumRectANYlayer, "%d RECT (non copper)", sumAnyRECT);
+    x = 0;
+    statisticSMD[x] = "SMD x\tSMD y\tRoundn.\tQ.";
+    for ( n = 0; n <= cntSMD; n++) {
+      if (cSMD[n]) {
+        sumSMD += cSMD[n];
+        if(minSMDx > SMDx[n]) minSMDx = SMDx[n];
+        if(minSMDy > SMDy[n]) minSMDy = SMDy[n];
+        x++;
+        sprintf(statisticSMD[x], "%s\t%s\t%d%c\t%-4d", value(SMDx[n], ""), value(SMDy[n], ""), rSMD[n], '%', cSMD[n]); // 2010-03-10
+      }
+    }
+
+    x = 0;
+    statisticPADdril[x] = "PAD drill\tQ.";
+    for (n = 0; n <= cntPDril; n++) {
+      if (cPadDrill[n]) {
+        sumPADdril += cPadDrill[n];
+        if(minPADdril > PadDrill[n]) minPADdril = PadDrill[n];
+        x++;
+        sprintf(statisticPADdril[x], "%s\t%-4d", value(PadDrill[n], ""), cPadDrill[n]);
+      }
+    }
+
+    x = 0;
+    statisticPADdiaTOP[x] = "PAD tDiam\tQ.";
+    for ( n = 0; n <= cntPDiamTOP; n++) {
+      if (cPadDiameterTOP[n]) {
+        sumPADdia += cPadDiameterTOP[n];
+        if(minPADdia > PadDiameterTOP[n]) minPADdia = PadDiameterTOP[n];
+        x++;
+        sprintf(statisticPADdiaTOP[x], "%s\t%-4d", value(PadDiameterTOP[n], ""), cPadDiameterTOP[n]);
+      }
+    }
+
+    x = 0;
+    statisticPADdiaBOT[x] = "PAD bDiam\tQ.";
+    for ( n = 0; n <= cntPDiamBOT; n++) {
+      if (cPadDiameterBOT[n]) {
+        sumPADdia += cPadDiameterBOT[n];
+        if(minPADdia > PadDiameterBOT[n]) minPADdia = PadDiameterBOT[n];
+        x++;
+        sprintf(statisticPADdiaBOT[x], "%s\t%-4d", value(PadDiameterBOT[n], ""), cPadDiameterBOT[n]);
+      }
+    }
+
+    x = 0;
+    statisticPADdiaI[x] = "PAD iDiam\tQ.";
+    for ( n = 0; n <= cntiPDiam; n++) {
+      if (ciPadDiameter[n]) {
+        sumPADdiaI += ciPadDiameter[n];
+        if(minPADdiaI > iPadDiameter[n]) minPADdiaI = iPadDiameter[n];
+        x++;
+        sprintf(statisticPADdiaI[x], "%s\t%-4d", value(iPadDiameter[n], ""), ciPadDiameter[n]);
+      }
+    }
+
+    x = 0;
+    statisticPADrestTOP[x] = "PAD tRestring\tQ.";
+    for ( n = 0; n <= cntPringTOP; n++) {
+      if (cPadRestringTOP[n]) {
+        sumPADrest += cPadRestringTOP[n];
+        if(minPADrest > PadRestringTOP[n]) minPADrest = PadRestringTOP[n];
+        x++;
+        sprintf(statisticPADrestTOP[x], "%s\t%-4d", value(PadRestringTOP[n], ""), cPadRestringTOP[n]);
+      }
+    }
+
+    x = 0;
+    statisticPADrestBOT[x] = "PAD bRestring\tQ.";
+    for ( n = 0; n <= cntPringBOT; n++) {
+      if (cPadRestringBOT[n]) {
+        sumPADrest += cPadRestringBOT[n];
+        if(minPADrest > PadRestringBOT[n]) minPADrest = PadRestringBOT[n];
+        x++;
+        sprintf(statisticPADrestBOT[x], "%s\t%-4d", value(PadRestringBOT[n], ""), cPadRestringBOT[n]);
+      }
+    }
+
+    x = 0;
+    statisticPADrestI[x] = "PAD iRestring\tQ.";
+    for ( n = 0; n <= cntPringI; n++) {
+      if (cPadRestringI[n]) {
+        sumPADrestI += cPadRestringI[n];
+        if(minPADrestI > PadRestringI[n]) minPADrestI = PadRestringI[n];
+        x++;
+        sprintf(statisticPADrestI[x], "%s\t%-4d", value(PadRestringI[n], ""), cPadRestringI[n]);
+      }
+    }
+
+    x = 0;
+    statisticVIAdril[x] = "VIA drill\tQ.";
+    for ( n = 0; n <= cntVDril; n++) {  // cntVDril
+      if (cViaDrill[n]) {
+        sumVIAdril += cViaDrill[n];
+        if(minVIAdril > ViaDrill[n]) minVIAdril = ViaDrill[n];
+        x++;
+        sprintf(statisticVIAdril[x], "%s\t%-4d", value(ViaDrill[n], ""), cViaDrill[n] );
+      }
+    }
+
+    x = 0;
+    statisticVIAdia[x] = "VIA Outer-Diam\tQ.";
+    for ( n = 0; n <= cntVDiam; n++) {
+      if (cViaDiameter[n]) {
+        sumVIAdiam += cViaDiameter[n];
+        if(minVIAdiam > ViaDiameter[n]) minVIAdiam = ViaDiameter[n];
+        x++;
+        sprintf(statisticVIAdia[x], "%s\t%-4d", value(ViaDiameter[n], ""), cViaDiameter[n] );
+      }
+    }
+
+    x = 0;
+    statisticVIAdiaI[x] = "VIA Inner-Diam.\tQ.";
+    for ( n = 0; n <= cntVDiamI; n++) {
+      if (cViaDiameterI[n]) {
+        sumVIAdiamI += cViaDiameterI[n];
+        if(minVIAdiamI > ViaDiameterI[n]) minVIAdiamI = ViaDiameterI[n];
+        x++;
+        sprintf(statisticVIAdiaI[x], "%s\t%-4d", value(ViaDiameterI[n], ""), cViaDiameterI[n] );
+      }
+    }
+
+    x = 0;
+    statisticVIArest[x] = "VIA Outer-Restring \tQ.";
+    for ( n = 0; n <= cntVringO; n++) {
+      if (cViaRestringO[n]) {
+        sumVIArest += cViaRestringO[n];
+        if(minVIArest > ViaRestringO[n]) minVIArest = ViaRestringO[n];
+        x++;
+        sprintf(statisticVIArest[x], "%s\t%-4d", value(ViaRestringO[n], ""), cViaRestringO[n]);
+      }
+    }
+
+    x = 0;
+    statisticVIArestI[x] = "VIA Inner-Restring\tQ.";
+    for ( n = 0; n <= cntVringI; n++) {
+      if (cViaRestringI[n]) {
+        sumVIArestI += cViaRestringI[n];
+        if(minVIArestI > ViaRestringI[n]) minVIArestI = ViaRestringI[n];
+        x++;
+        sprintf(statisticVIArestI[x], "%s\t%-4d", value(ViaRestringI[n], ""), cViaRestringI[n]);
+      }
+    }
+
+    x = 0;
+    statisticVIAstack[x] = "VIA Stack\tQ.";
+    for ( n = 0; n < cntStack; n++) {
+      x++;
+      sprintf(statisticVIAstack[x], "%s\t%-4d", ViaStack[n], ViaStackCnt[n]);
+    }
+
+    x = 0;
+    statisticHOLE[x] = "HOLE drill\tQ.";
+    for ( n = 0; n <= cntHole; n++) {
+      if (cHole[n]) {
+        sumHOLE += cHole[n];
+        if(minHOLE > Hole[n]) minHOLE = Hole[n];
+        x++;
+        sprintf(statisticHOLE[x], "%s\t%-4d", value(Hole[n], ""), cHole[n]);
+      }
+    }
+
+    x = 0;
+    statisticTEXTw[x] = "TEXT (w)\tQ.";
+    for ( n = 0; n <= cntTextWidth; n++) {
+      if (cTextWidth[n]) {
+        sumTEXTw += cTextWidth[n];
+        if(minTEXTw > TextWidth[n]) minTEXTw = TextWidth[n];
+        x++;
+        sprintf(statisticTEXTw[x], "%s\t%-4d",  value(TextWidth[n], ""),cTextWidth[n] );
+      }
+    }
+
+    x = 0;
+    statisticTEXTsize[x] = "TEXT (s)\tQ.";
+    for ( n = 0; n <= cntTextSize; n++) {
+      if (cTextSize[n]) {
+        x++;
+        sprintf(statisticTEXTsize[x], "%s\t%-4d",  value(TextSize[n], ""),cTextSize[n] );
+      }
+    }
+
+    x = 0;
+    statisticPlaceTEXTw[x] = "TEXT \tQ.";
+    for ( n = 0; n <= cntPlaceTextWidth; n++) {
+      if (cPlaceTextWidth[n]) {
+        sumPlaceTEXTw += cPlaceTextWidth[n];
+        if(minPlaceTEXTw > PlaceTextWidth[n]) minPlaceTEXTw = PlaceTextWidth[n];
+        x++;
+        sprintf(statisticPlaceTEXTw[x], "%s\t%-4d",  value(PlaceTextWidth[n], ""),cPlaceTextWidth[n] );
+      }
+    }
+
+    x = 0;
+    statisticPlaceTEXTsize[x] = "TEXT \tQ.";
+    for ( n = 0; n <= cntPlaceTextSize; n++) {
+      if (cPlaceTextSize[n]) {
+        x++;
+        sprintf(statisticPlaceTEXTsize[x], "%s\t%-4d",  value(PlaceTextSize[n], ""),cPlaceTextSize[n] );
+      }
+    }
+
+    x = 0;
+    statisticLBR[x] = "LIBRARY\tQ.";
+    for ( n = 0; n <= cntLbr; n++) {
+      if (cLbr[n]) {
+        x++;
+        sprintf(statisticLBR[x], "%s\t%-4d",  Lbr[n], cLbr[n] );
+      }
+    }
+
+    x = 0;
+    statisticPAC[x] = "PACKAGE\tQ.";
+    for ( n = 0; n <= cntPacName; n++) {
+      if (cPacName[n]) {
+        x++;
+        sprintf(statisticPAC[x], "%s\t%-4d",  PacName[n], cPacName[n] );
+      }
+    }
+
+    x = 0;
+    statisticValPacLay[x] = "VALUE\tPAC\tQ.\tTop\tBot";
+    for ( n = 0; n <= cntEVPL; n++ ) {
+      if (cEVPL[n]) {
+        x++;
+        sprintf(statisticValPacLay[x], "%s\t%s\t%d\t%d\t%d",
+                EVALpac[n], EvalPAC[n], cEVPL[n], cEVPL1[n], cEVPL16[n] );
+      }
+    }
+    sprintf(statisticLocked, "%d Elements: %d locked / %d unlocked", cntElement, cntLocked, cntElement-cntLocked);
+    sprintf(statisticTestPoint, "%d Testpoints (TP)", cntTPelement);
+    x = 0;
+    // Drill Rack statistic
+    status("Drill/Rack");
+    B.holes(H) AddDrilling(H.drill);
+    B.signals(S) S.vias(V) AddDrilling(V.drill);
+    B.elements(E) {
+      E.package.contacts(C) {
+        if (C.pad)
+          AddDrilling(C.pad.drill);
+      }
+      E.package.holes(H) AddDrilling(H.drill);
+    }
+    sort(imax, Drilling);
+
+    drillRack[0] = "RACK";
+    for (int i = 0; i < imax; ++i) {
+      string s;
+      sprintf(s, "T%02d %5.*f", i + 1, unitPrec[uval], Drilling[i]);
+      drillRack[i + 1] = s;
+    }
+    status("Unroutet");
+    if (SignalUnrouted) {
+      sprintf(displayUnrouted, "<nobr>%d &nbsp;&nbsp; <font color=red> unroutet (airwire)</font></nobr>", SignalUnrouted );
+      sprintf(Unrouted, "%d", SignalUnrouted);
+    }
+    status("Generate statistic list"); // 2007-12-19 alf@cadsoft.de
+
+    // Stop/Cream mask statistic 2006-04-28
+    sprintf(statisticSTOP_CREAM[0], "%d\t tStop Pad", padlSTOP[0]);
+    sprintf(statisticSTOP_CREAM[1], "%d\t tStop Smd", smdlSTOP[0]);
+    sprintf(statisticSTOP_CREAM[2], "%d\t tStop Pac", lSTOPpac[0]);      // tMask in Board/Package
+    sprintf(statisticSTOP_CREAM[3], "%d\t tStop Brd", lSTOPbrd[0]);      // tMask in Board/Package
+    sprintf(statisticSTOP_CREAM[4], "%d\t tStop", padlSTOP[0] + smdlSTOP[0] + lSTOPpac[0] + lSTOPbrd[0]);
+
+    sprintf(statisticSTOP_CREAM[5], "%d\t bStop Pad", padlSTOP[1]);
+    sprintf(statisticSTOP_CREAM[6], "%d\t bStop Smd", smdlSTOP[1]);
+    sprintf(statisticSTOP_CREAM[7], "%d\t bStop Pac", lSTOPpac[1]);      // tMask in Board/Package
+    sprintf(statisticSTOP_CREAM[8], "%d\t bStop Brd", lSTOPbrd[1]);      // tMask in Board/Package
+    sprintf(statisticSTOP_CREAM[9], "%d\t bStop", padlSTOP[1] + smdlSTOP[1] + lSTOPpac[1] + lSTOPbrd[1]);
+
+    sprintf(statisticSTOP_CREAM[10], "%d\t tCream Smd", smdlCREAM[0]);
+    sprintf(statisticSTOP_CREAM[11], "%d\t tCream Pac", lCREAMpac[0]);     // tCream in Board/Package
+    sprintf(statisticSTOP_CREAM[12], "%d\t tCream Brd", lCREAMbrd[0]);     // tCream in Board/Package
+    sprintf(statisticSTOP_CREAM[13], "%d\t tCream", smdlCREAM[0] + lCREAMpac[0] + lCREAMbrd[0]);     // tCream in Board/Package
+
+    sprintf(statisticSTOP_CREAM[14], "%d\t bCream Smd", smdlCREAM[1]);
+    sprintf(statisticSTOP_CREAM[15], "%d\t bCream Pac", lCREAMpac[1]);     // bCream in Board/Package
+    sprintf(statisticSTOP_CREAM[16], "%d\t bCream Brd", lCREAMbrd[1]);     // bCream in Board/Package
+    sprintf(statisticSTOP_CREAM[17], "%d\t bCream", smdlCREAM[1] + lCREAMpac[1] + lCREAMbrd[1]);     // bCream in Board/Package
+
+
+    // summary ******************
+    string Tsummary_area;
+    sprintf(Tsummary_area, "~ %.2f mm² (%.3f dm²)", summary_area, summary_area/10000.0);
+
+    sprintf(sum, "%-6d\t Wire(s) incl. Arc(s)\n%-6d\t Polygon(s)\n_________________________\n" +
+                 "%-6d\t SMD(s) top\n%-6d\t SMD(s) bottom\n===================\n%-6d\t SMD(s) total\n\n" +
+                 "%-6d\t PAD(s)\n_________________________\n" +
+                 "%-6d\t Via\n%-6d\t Hole\n===================\n" +
+                 "%-6d\t Drills total\n_________________________\n"+
+                 "%s\n%s\n_________________________\n" +
+                 "Routing Info: \n%-6d\t Signal(s) \n" +
+                 "%-6d\t PAD/SMD total\n===================\n" +
+                 "%-6d\t PAD/SMD on Signal\n_________________________\n"+
+                 "Packages used area:\n%s\n_________________________\n",
+                  sumWires + sumARCw,
+                  sumPOLYw,
+                  cntSMDt,
+                  cntSMDb,
+                  sumSMD,
+                  sumPADdril,
+                  cntVias,                        // 2012-05-24
+                  sumHOLE,
+                  sumPADdril + cntVias + sumHOLE,  // sumVIAdril
+                  statisticSTOP_CREAM[13],        // 2006-04-28
+                  statisticSTOP_CREAM[17],
+                  sumSignals,
+                  sumSMD + sumPADdril,
+                  cnt_pad_on_signal,
+                  Tsummary_area
+           );
+
+    sprintf(LabelcntRECT, "%d RECT (copper)", sumcntRECT);
+    sprintf(LabelcntTextSize, "%d TEXT size (copper)", cntTextSize);
+    sprintf(LabelcntTextWidth, "%d TEXT wire width (copper)", cntTextWidth);
+    sprintf(LabelcntPlaceTextSize, "%d TEXT size (place)", cntPlaceTextSize);
+    sprintf(LabelcntPlaceTextWidth, "%d TEXT wire width (place)", cntPlaceTextWidth);
+    sprintf(LabelcntCIRCLE, "%d CIRCLE (copper)", sumcntCircl);
+    sprintf(LabelcntRectANYlayer, "%d RECT (any layer)", sumAnyRECT);
+    for (int ln = 1; ln < 16; ln++) {
+      if (SupplyLayersUsedPolygons[ln]) {
+        string sl;
+        sprintf(sl, "%d:%s:(%d) ", ln, SupplyLayerName[ln], SupplyLayersUsedPolygons[ln]);
+        checkSupplyLayerPolygon += sl;
+      }
+    }
+    int Selected = 0;
+    int StopCreamSelected = 0;
+    int MCselected = 0;
+    int ECselected = 0;
+    // *********************************************************************
+    dlgDialog("Statistic of " + B.name) {
+      showminValWidth = check_min_ValueWidth();
+      showminValOther = check_min_ValueOther();
+      dlgHBoxLayout dlgSpacing(850);
+      dlgHBoxLayout {
+        dlgTabWidget {  // *** Board ***
+          dlgTabPage("&BOARD") {
+            dlgHBoxLayout {
+              dlgSpacing(10);
+              dlgVBoxLayout {
+                dlgSpacing(10);
+                dlgLabel(brdmaximum);
+                dlgSpacing(5);
+                dlgLabel(brdoutline);
+                dlgLabel("<hr>");
+                dlgLabel(usedLayer);
+                dlgLabel(displayLayerError);
+                dlgStretch(1);
+              }
+              dlgSpacing(10);
+              dlgVBoxLayout {
+                dlgGroup("Summary") {
+                  dlgLabel(sum);
+                  dlgHBoxLayout {
+                    if (SignalUnrouted) {
+                      dlgLabel(displayUnrouted);
+                      dlgStretch(1);
+                    }
+                  }
+                }
+                dlgStretch(1);
+              }
+              dlgSpacing(5);
+              dlgVBoxLayout {
+                dlgGroup("Minor values") {
+                  dlgHBoxLayout {
+                    dlgVBoxLayout {
+                      dlgLabel(showminValWidth, 1);
+                      dlgHBoxLayout dlgSpacing(200);
+                    }
+                    dlgVBoxLayout {
+                    dlgLabel(showminValOther, 1);
+                    string emptyval = " ";
+                    if (emptyValue) sprintf(emptyval, "%d <font color=red>%s</font>%s Values", emptyValue, empty, attention);
+                    dlgSpacing(6);
+                    dlgLabel(emptyval);
+                  }
+                }
+                dlgSpacing(8);
+                dlgHBoxLayout {
+                  dlgPushButton("&Edit") {
+                    GetCheckValues();
+                    showminValWidth = check_min_ValueWidth();
+                    showminValOther = check_min_ValueOther();
+                  }
+                  dlgStretch(1);
+                }
+              }
+              if (PolyWidthError) dlgLabel("<b><font color=\"red\">" + PolygonError + "</font></b><br> Details see Tab POLYGON.");
+            }
+            dlgStretch(1);
+          }
+        }
+        dlgTabPage("&LAYER") {   // *** all Layer are defined ***
+          int layselect = 0;
+          dlgHBoxLayout {
+            dlgListView("Nb.:\tName\tUsed", allLayers, layselect ); // 2005-11-17 alf@cadsoft.de
+            dlgStretch(1);
+          }
+        }
+
+        dlgTabPage("&CLASS (Signal)") {   // *** Class clearance/isolate ***
+          string classlabel = "Class 0: " + NetClassName[0];
+          string ClassNameL = NetClassLabel(NetClassName[SignalClassSelect] , cNetClass[SignalClassSelect]);
+          string SignalList = SignalClassList[selNetClassNr[SignalClassSelect]];
+          dlgHBoxLayout {
+            dlgVBoxLayout {
+              dlgListView("", statisticCLASS, SignalClassSelect) {  // 2007-12-04 - Corrected Class handling to select net-list if classes empty
+                SignalList = SignalClassList[selNetClassNr[SignalClassSelect]];
+                sprintf(classlabel, "Class %d : %s",
+                selNetClassNr[SignalClassSelect],
+                NetClassName[selNetClassNr[SignalClassSelect]]);
+              }
+              dlgSpacing(12);
+              if (falseSignalCnt) {
+                dlgLabel("<font color=\"red\">False signals (not connected on PAD or SMD)</font>");
+                dlgListView("", statisticFalseSignals, SignalClassSelect);
+              }
+              /********* 2009-02-12 *********/
+              if (deleteRudimentalSignalName) {
+                dlgLabel(" ");
+                dlgLabel("<b>Found rudimentarily signal name(s).</b>");
+                dlgLabel("You wish to delete this rudimentarily signal names, press button Delete");
+                dlgPushButton("&Delete") {
+                  dlgAccept();
+                  exit("GRID MM;\n"+deleteRudimentalSignalName+"GRID LAST;\nRUN '"+filename(argv[0])+"'");
+                }
+              }
+            }
+            dlgSpacing(12);
+            dlgGroup("Netlist") {
+              dlgLabel(classlabel, 1);
+              dlgHBoxLayout {
+                dlgSpacing(4);
+                dlgTextView(SignalList);
+              }
+            }
+            dlgStretch(1);
+          }
+        }
+
+        dlgTabPage("&WIDTH") {  // *** Wire / Text ***
+          dlgHBoxLayout {
+            dlgListView("", statisticWirew, Selected);
+            dlgListView("", statisticARCw, Selected);
+            dlgSpacing(8);
+            dlgVBoxLayout {
+              dlgListView("", statisticTEXTw, Selected);
+              dlgLabel(LabelcntTextWidth);
+            }
+            dlgSpacing(8);
+            dlgVBoxLayout {
+              dlgListView("", statisticTEXTsize, Selected);
+              dlgLabel(LabelcntTextSize);
+            }
+            dlgStretch(1);
+          }
+          dlgHBoxLayout {
+            if (SignalUnrouted) {
+              dlgSpacing(8);
+              dlgLabel(displayUnrouted);
+              dlgStretch(1);
+            }
+          }
+          dlgLabel(wireWidthInternal);
+        }
+
+        dlgTabPage("POL&YGON") {  // *** Polygon ***
+          int selp;
+          dlgHBoxLayout {
+            dlgListView("", statisticPolyw, Selected);
+            dlgListView("", statisticPoliso, Selected);
+            dlgSpacing(8);
+            dlgVBoxLayout {
+              dlgListView("Type\tName\tLayer\tRank\tWidth", PolygonLayer, Selected);
+              if (PolyWidthError) dlgLabel("<b><font color=\"red\">" + PolygonError + "</font></b>");
+              dlgLabel(wireWidthInternal);
+            }
+            dlgStretch(1);
+          }
+        }
+
+        dlgTabPage("&SMD") {   // *** Smd ***
+          dlgHBoxLayout {
+            dlgListView("", statisticSMD, Selected);
+            dlgStretch(2);
+          }
+        }
+
+        dlgTabPage("&PAD") {  // *** Pad ***
+          dlgHBoxLayout {
+            dlgVBoxLayout {
+              dlgListView("", statisticPADdiaTOP, Selected);
+              dlgListView("", statisticPADdiaBOT, Selected);
+            }
+            dlgVBoxLayout {
+              dlgListView("", statisticPADrestTOP, Selected);
+              dlgListView("", statisticPADrestBOT, Selected);
+            }
+            dlgListView("", statisticPADdiaI, Selected);
+            dlgListView("", statisticPADrestI, Selected);
+            dlgStretch(1);
+          }
+        }
+
+        dlgTabPage("&VIA") {  // *** Via ***
+          dlgHBoxLayout {
+            dlgVBoxLayout {
+              dlgListView("", statisticVIAdia, Selected);
+              dlgListView("", statisticVIArest, Selected);
+            }
+            dlgVBoxLayout {
+              dlgListView("", statisticVIAdiaI, Selected);
+              dlgListView("", statisticVIArestI, Selected);
+            }
+            dlgListView("", statisticVIAstack, Selected);
+            dlgStretch(1);
+          }
+        }
+
+        dlgTabPage("&DRILL/HOLE") {  // *** Drill Hole ***
+          int plrSelected = -1;
+          int vlrSelected = -1;
+          int hlrSelected = -1;
+          int lrSelected = -1;
+          int vrSelected = -1;
+          int shSel = 0;
+          string StackHead = "select a Layer/Rack";
+          dlgHBoxLayout {
+            dlgListView("", statisticPADdril, plrSelected);
+            dlgListView("", statisticVIAdril, vlrSelected);
+            dlgListView("", statisticHOLE, hlrSelected);
+            dlgListView("", drillRack, lrSelected);
+            dlgSpacing(12);
+            dlgListView("Layer/Rack", ViaStack, vrSelected) {
+              StackHead = "RACK/"+ ViaStack[vrSelected] + "\tQ.";
+              showLayerRack(vrSelected); //  + "\n" + StackDrills[rack]
+            }
+            dlgListView(StackHead, showStackDrills, shSel);
+            //dlgStretch(1);
+          }
+        }
+
+        dlgTabPage("&ELEMENT") {   // *** Element ***
+          dlgHBoxLayout {
+            dlgVBoxLayout {
+              dlgHBoxLayout {
+                dlgListView("", statisticLBR, LBRselected) {
+                  art_selected = 1;
+                  get_Info(art_selected, statisticLBR[LBRselected]);
+                  dlgRedisplay();
+                }
+                dlgListView("", statisticPAC, PACselected) {
+                  art_selected = 2;
+                  get_Info(art_selected, statisticPAC[PACselected]);
+                  dlgRedisplay();
+                }
+              }
+              dlgHBoxLayout {
+                dlgListView("", statisticValPacLay, VALselected) {
+                  art_selected = 3;
+                  get_Info(art_selected, statisticValPacLay[VALselected]);
+                  dlgRedisplay();
+                }
+              }
+            }
+            dlgVBoxLayout {
+              dlgHBoxLayout dlgSpacing(250);
+              dlgLabel(linfo ,1);
+              dlgSpacing(10);
+              dlgTextView(Element_info);
+            }
+            dlgVBoxLayout {
+              //dlgListView("Electrical", EContact, ECselected);  // 2009-12-02
+              dlgListView("Mech. Part\tPac.", EnoContact, MCselected);
+            }
+          }
+          dlgSpacing(8);
+          dlgLabel(statisticLocked); // 2007-12-19 alf@cadsoft.de
+          if (cntTPelement) dlgLabel(statisticTestPoint); // 2010-06-09
+          dlgSpacing(12);
+          dlgLabel("<nobr>Packages used area <b>"+Tsummary_area+"</b></nobr>");
+        }
+
+        dlgTabPage("&MASK") {  // *** Stop & Cream MASK ***
+          dlgHBoxLayout {
+            dlgListView("Count\tLayer", statisticSTOP_CREAM, StopCreamSelected, msort);
+            dlgStretch(1);
+          }
+        }
+
+        dlgTabPage("&RECT CIRCLE") {  // *** Rect / Circle ***
+          dlgHBoxLayout {
+            dlgVBoxLayout {
+              dlgListView("", statisticRECT, Selected);
+              dlgLabel(LabelcntRECT);
+            }
+            dlgVBoxLayout {
+              dlgListView("", statisticRectANYlayer, Selected);
+              dlgLabel(LabelcntRectANYlayer);
+            }
+            dlgSpacing(8);
+            dlgVBoxLayout {
+              dlgListView("", statisticCIRw, Selected);
+              dlgLabel(LabelcntCIRCLE);
+            }
+            dlgVBoxLayout {
+              dlgListView("", statisticCIRdiam, Selected);
+              dlgLabel(LabelcntCIRCLE);
+            }
+            dlgStretch(1);
+          }
+        }
+
+        dlgTabPage("&TEXT") {  // *** Text ***
+          dlgHBoxLayout {
+            dlgVBoxLayout {
+              dlgListView("", statisticPlaceTEXTw, Selected);
+              dlgLabel(LabelcntPlaceTextWidth);
+            }
+            dlgVBoxLayout {
+              dlgListView("", statisticPlaceTEXTsize, Selected);
+              dlgLabel(LabelcntPlaceTextSize);
+            }
+            dlgStretch(1);
+          }
+        }
+      }
+    }
+    if (checkSupplyLayerPolygon) dlgLabel("<font color=\"red\">Polygon(s) in SUPPLY-LAYER, please check! :</font><br><font color=\"blue\">" + checkSupplyLayerPolygon + "</font>");
+    dlgHBoxLayout {
+      dlgPushButton("-&Quit") dlgAccept();
+      dlgPushButton("&Save report") {
+        string fileName = dlgFileSave("Select a file", filesetext(brdfile,".rep"), "*.rep");
+        if (fileName) {
+          output(fileName, "wt") {
+            printf("%s", saveReport());
+          }
+        }
+      }
+      dlgSpacing(50);
+        dlgLabel("All Units = " + unit[uval]);
+        dlgSpacing(50);
+        dlgStretch(1);
+        dlgLabel(Version);
+      }
+      dlgHBoxLayout {
+        dlgLabel("Database:");
+        dlgLabel(brdfile, 1);
+        dlgStretch(1);
+      }
+    };
+    exit (0);
+  }
+}
+
+else dlgMessageBox("Start this  ULP from a Board", "OK");
+

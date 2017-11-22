@@ -1,0 +1,51 @@
+Mfg Part Num	Mfg Name	VID	Vendor Part Num	Description	Pkg Code
+ADUCM350BBCZ	Analog Devices	DK	ADUCM350BBCZ-ND	IC MCU 16BIT AFE 120BGA	Surface Mount 120-LFBGA CSPBGA
+ADG1608BRUZ	Analog Devices	DK	ADG1608BRUZ-ND	IC MULTIPLEXER 8X1 16TSSOP	Surface Mount 16-TSSOP
+ADP3333ARMZ-3.3-R7	Analog Devices	DK	ADP3333ARMZ-3.3-R7CT-ND	IC REG LDO 3.3V 0.3A 8MSOP	Surface Mount 8-MSOP
+EYSGJNAWY-1X	Taiyo Yuden	DK	587-4378-1-ND	RF TXRX MOD BLUETOOTH TRACE ANT	BLE Module
+DSILC6-4P6	STMicroelectronics	DK	497-5544-2-ND	TVS DIODE 5VWM SOT666 ESD DIODE	Surface Mount SOT-666
+5003	Keystone Electronics	DK	36-5003-ND	TEST POINT PC MINI .040D ORANGE	0.040 Hole Diameter
+5007	Keystone Electronics	DK	36-5007-ND	TEST POINT PC COMPACT .063D WHT	0.063 Hole Diameter
+3002TR	Keystone Electronics	DK	36-3002CT-ND	HOLDER BATTERY COIN 20MM DIA SMD	Surface Mount Coincell Holder
+B3S-1000	Omron Electronics	DK	SW415-ND	SWITCH TACTILE SPST-NO 0.05A 24V	Surface Mount Button
+1825910-6	TE Connectivity	DK	450-1650-ND	Tactile Switch SPST-NO Top Actuated Through Hole	Through Hole Button
+G22AP	NKK Switches	DK	360-2791-ND	SWITCH TOGGLE DPDT 0.4VA 28V	SwitchDPDT
+969102-0000-DA	3M	DK	3M9580-ND	SHUNT JUMPER .1 BLACK GOLD	Shunt cover for jumper
+M20-9990246	Harwin	DK	952-2262-ND	2 Positions Header Unshrouded Breakaway Connector 0.100 Through Hole Tin	Through Hole Male 2 Pin
+M20-9990345	Harwin	DK	952-2263-ND	3 Positions Header Unshrouded Breakaway Connector 0.100 Through Hole Gold	Through Hole
+61300821021	Wurth Electronics	DK	732-5353-ND	8 Positions Header Unshrouded Connector 0.100 Through Hole Right Angle Gold	Through Hole Right Angle
+61200821621	Wurth Electronics	DK	         732-5395-ND	8 Positions Header Shrouded Connector 0.100 2.54mm Through Hole	Through Hole shrouded 8 pin header
+61200820621	Wurth Electronics	DK	732-5476-5-ND	8 Positions Header Shrouded Connector 0.100 2.54mm Surface Mount Gold	Surface Mount Shrouded 8 pin connector
+61200823021	Wurth Electronics	DK	732-5444-ND	CONN HEAD 8 POS 2.54 FOR CABLE	8 pin cable connector
+1729128	Phoenix Contact	DK	277-1247-ND	CONN TERM BLOCK 2POS GREEN	Through Hole 2pin Power connector
+150060RS75000	Wurth Electronics	DK	732-4978-1-ND	LED RED CLEAR 0603 SMD	0603 1608 Metric
+150060YS75000	Wurth Electronics	DK	732-4981-1-ND	LED YELLOW CLEAR 0603 SMD	0603 1608 Metric
+150060GS75000	Wurth Electronics	DK	732-4971-1-ND	LED GREEN CLEAR 0603 SMD	0603 1608 Metric
+150060BS75000	Wurth Electronics	DK	732-4966-1-ND	LED BLUE CLEAR 0603 SMD	0603 1608 Metric
+MCR03EZPJ000	Rohm Semiconductor	DK	RHM0.0GTR-ND	RES SMD 0.0OHM JUMPER 1-10W 0603	0603 1608 Metric
+MCR03ERTJ101	Rohm Semiconductor	DK	RHM100CGDKR-ND	RES SMD 100 OHM 0603	0603 1608 Metric
+MCR03ERTF5600	Rohm Semiconductor	DK	RHM560CFCT-ND	RES SMD 560 OHM 1-10W 0603	0603 1608 Metric
+MCR100JZHJ1R6	Rohm Semiconductor	DK	RHM1.6BCCT-ND	RES SMD 1.6 OHM 1W 2512	2512 6432 Metric
+MCR03EZPFX1002	Rohm Semiconductor	DK	RHM10.0KHCT-ND	RES SMD 10K OHM 1-10W 0603	0603 1608 Metric
+MCR03ERTJ102	Rohm Semiconductor	DK	RHM1.0KCGCT-ND	RES SMD 1K OHM 1-10W 0603	0603 1608 Metric
+GRM188R71C104KA01D	Murata Electronics North America	DK	490-1532-2-ND	0.10µF 16V X7R Ceramic Capacitor	0603 1608 Metric
+GRM188R71E224KA88D	Murata Electronics North America	DK	490-3290-1-ND	0.22µF 25V X7R Ceramic Capacitor	0603 1608 Metric
+GRM188R71E474KA12D	Murata Electronics North America	DK	490-3291-2-ND	0.47µF 25V X7R Ceramic Capacitor	0603 1608 Metric
+GRM188R60J105KA01D	Murata Electronics North America	DK	490-1550-1-ND	1µF 6.3V X5R Ceramic Capacitor	0603 1608 Metric
+GRM188R60J475ME19D	Murata Electronics North America	DK	490-5421-1-ND	4.7µF 6.3V X5R Ceramic Capacitor	0603 1608 Metric
+GRM188R60G106ME47D	Murata Electronics North America	DK	490-3298-1-ND	10µF 4V X5R Ceramic Capacitor	0603 1608 Metric
+GRM21BR60G107ME15L	Murata Electronics North America	DK	490-10510-1-ND	100µF 4V Ceramic Capacitor	0805 2012 Metric
+GRM1885C1H150JA01D	Murata Electronics North America	DK	490-1407-1-ND	15pF 50V Ceramic Capacitor	0603 1608 Metric
+GRM1885C1H240JA01D	Murata Electronics North America	DK	490-1412-1-ND	24pF 50V Ceramic Capacitor	0603 1608 Metric
+AQ137M350FA1BE	AVX Corporation	DK	AQ137M350FA1BE-ND	35pF 500V Ceramic Capacitor	1111 2828 Metric
+FA-238 16.0000MB-K3	EPSON	MOUSER	732-FA238-16B-K3	 16MHz 50ppm Crystal 10pF 80 Ohm	4-SMD
+ECS-.327-7-34B-TR	ECS	DK	XC1656CT-ND	32.768kHz 20ppm Crystal 7pF 70 kOhm	2-SMD
+SER3673CT-ND	Epson	DK	FC-12M 32.7680KD-A3	32.768kHz ±30ppm Crystal 12.5pF 90 kOhm	2-SMD
+BLM18HG601SN1D	Murata Electronics North America	DK	490-1033-1-ND	FERRITE BEAD 600 OHM 1LN	0603 1608 Metric
+25501	Keystone Electronics	DK	36-25501-ND	HEX STANDOFF M3 NYLON 10MM	M3 Stand Off 
+25510	Keystone Electronics	DK	36-25510-ND	Hex Standoff Threaded M3 Nylon 10.00mm	M3 Stand Off 
+29341	Keystone Electronics	DK	36-29341-ND	MACHINE SCREW PAN SLOTTED M3	M3 Screw
+4688	Keystone Electronics	DK	        36-4688-ND	HEX NUT NYLON M3	M3 Hex Nut
+AFE4404YZPT	Texas Instruments	DK	296-42176-1-ND	1 Channel AFE 6 Bit 15-DSBGA	15-DSBGA
+EHF-110-01-L-D-SM	Samtec	DK	SAM8210-ND	20 Positions Header Shrouded Connector 0.050 1.27mm Surface Mount Gold	JTAG Connector SMT
+20021521-00010T1LF	Amphenol FCI	DK	609-4054-ND	10 Positions Header Shrouded Connector 0.050 1.27mm Surface Mount Gold	SWD Connector SMT

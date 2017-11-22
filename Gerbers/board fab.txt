@@ -1,0 +1,10 @@
+Board fabrication
+PCB thickness of 1.6mm (.062”)
+FR4 high Tg, Finished copper 1 ounce all layers and silk color White
+Solder mask both sides, green LPI mask 
+Silkscreen top side only
+8 mil minimum drill
+6 mil minimum trace width
+6 mil minimum trace spacing
+4 mil annular ring
+Finish ENIG
