@@ -15,5 +15,5 @@ It's the same technique as is used in CATSCAN's, except the current running thro
 
 ![alt text](images/eit_anti-clockwise_motion.png "EIT example")
 
-
+Improvements are welcome to this design. To increase resolution you could make a rotational version which is time resolution limited, or simply add more electrodes and re-compute the reconstruction that way. Another intended improvement is to move to tetrapolar differential electrodes set up. 
 
