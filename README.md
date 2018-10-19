@@ -22,4 +22,4 @@ It's the same technique as is used in CATSCAN's, except the current running thro
 Improvements are welcome to this design. To increase resolution you could make a rotational version which is time resolution limited, or simply add more electrodes and re-compute the reconstruction that way. Another intended improvement is to move to tetrapolar differential electrodes set up. If you'd like to collaborate just pull the repository or email contact@mindseyebiomedical.com
 
 We'd love to hear how you are using this! 
-
+This is my first test.
