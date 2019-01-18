@@ -1,6 +1,7 @@
 # Eagle_EIT
 
-## Not the following design is an older design for an 8 electrode system. I have a newer system which was designed in Altium which I'll put up here as soon as crowd supply campaign finalized: 
+Note: the following design is an older design for an 8 electrode system. I have a newer better system which was designed in Altium which I'll put up here as soon as crowd supply campaign finalized. In the meantime I'd love it if you wanted to join the mailing list! 
+
 https://www.crowdsupply.com/mindseye-biomedical/spectra
 
 ## EIT PCB design in Eagle CAD
