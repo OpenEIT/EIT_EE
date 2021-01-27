@@ -30,7 +30,7 @@ We'd love to hear how you are using this!
 
 ## New Board Design 
 
-We have a newer better board design we are about to publish here, stay tuned. 
+We have a newer better board design which is uploaded and called Spectra.pdf. Check it out. 
 
 
 ## Future Plans 
