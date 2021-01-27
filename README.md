@@ -1,3 +1,7 @@
+# Spectra PDF
+
+The schematic for the 32 electrode EIT system is called Spectra.pdf and is contained in the top level directory. Please let me know if you think it should have any modifications. 
+
 # Eagle_EIT
 
 Note: the following design is an older design for an 8 electrode system. I have a newer better system which was designed in Altium which I'll put up here as soon as crowd supply campaign finalized. In the meantime I'd love it if you wanted to join the mailing list! 
